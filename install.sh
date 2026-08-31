@@ -118,7 +118,7 @@ dnf install -y fuse fuse-libs
 dnf install -y git wget curl rsync thefuck
 
 # Fastfetch, Vaapi, Sound, Printer&Scanner for Canon e400 series, Fcitx5
-dnf install -y libva-intel-driver  pipewire wireplumber alsa-utils usbutils cups gutenprint gutenprint-cups sane-backends fcitx5 fcitx5-rime fcitx5-gtk fcitx5-qt
+dnf install -y libva-intel-driver  pipewire wireplumber alsa-utils usbutils cups gutenprint gutenprint-cups sane-backends fcitx5 fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram
 
 # Add user to lp group
 usermod -aG lp "$ACTUAL_USER"

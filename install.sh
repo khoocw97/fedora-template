@@ -90,11 +90,13 @@ fi
 # ---------------------------------------------------------------------
 color_echo "blue" "[4/5] Enabling RPM Fusion and completing system multimedia decoders..."
 # Enable Fedora's OpenH264 repo (H.264 codec for Firefox)
-dnf config-manager setopt fedora-cisco-openh264.enabled=1
+# dnf config-manager setopt fedora-cisco-openh264.enabled=1
 # Use dynamic mirror source to ensure optimal routing.
 dnf install -y https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
 dnf install -y https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
 dnf install -y 'rpmfusion-*-appstream-data'
+
+dnf install -y --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
 
 # Replace Fedora's restricted ffmpeg-free package with the full FFmpeg package.
 dnf swap ffmpeg-free ffmpeg --allowerasing -y
@@ -105,8 +107,9 @@ dnf install @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-
 # 5. Installation of core applications and tools
 # ---------------------------------------------------------------------
 color_echo "blue" "[5/5] Installing dnf packages..."
-# WM
-dnf install -y niri
+
+# WM & Shell
+dnf install -y umbriel-nightly noctalia
 
 # Flatpak & locale
 dnf install -y flatpak glibc-langpack-zh glibc-langpack-en
@@ -115,7 +118,7 @@ dnf install -y flatpak glibc-langpack-zh glibc-langpack-en
 dnf install -y fuse fuse-libs
 
 # Network CLI & Sync
-dnf install -y git wget curl rsync thefuck
+dnf install -y git wget curl rsync
 
 # Fastfetch, Vaapi, Sound, Printer&Scanner for Canon e400 series, Fcitx5
 dnf install -y libva-intel-driver  pipewire wireplumber alsa-utils usbutils cups gutenprint gutenprint-cups sane-backends fcitx5 fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram
@@ -143,7 +146,7 @@ dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megac
 
 # === Personal Software ===
 dnf makecache
-dnf install -y firefox google-chrome-stable vlc yazi xournalpp helium-bin
+dnf install -y firefox google-chrome-stable vlc yazi xournalpp helium-bin 
 
 # =====================================================================
 # Application configuration area for non-ROOT user environments (Flatpak/Flathub)

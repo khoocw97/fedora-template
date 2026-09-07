@@ -148,7 +148,7 @@ dnf install @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-
 color_echo "blue" "[5/5] Installing dnf packages..."
 
 BASE_PKGS=(
-    ly umbriel-nightly noctalia gnome-keyring gnome-keyring-pam # login manager,wm,shell,keyring
+    ly terminus-fonts umbriel-nightly noctalia gnome-keyring gnome-keyring-pam # login manager,wm,shell,keyring, ly font fix Lat2-Terminus16
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
     fuse fuse-libs # AppImage support
     fastfetch usbutils git wget curl rsync #  tools
@@ -171,7 +171,7 @@ After=getty@tty2.service
 [Service]
 Type=idle
 ExecStartPre=/usr/bin/printf '%%b' '\e]P011121D\e]P7A9B1D6\ec'
-ExecStartPre=-/usr/bin/setfont -C /dev/tty2 eurlatgr
+ExecStartPre=-/usr/bin/setfont -C /dev/tty2 Lat2-Terminus16
 ExecStart=/usr/bin/ly
 StandardInput=tty
 TTYPath=/dev/tty2

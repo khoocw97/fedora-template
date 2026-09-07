@@ -151,7 +151,7 @@ BASE_PKGS=(
     ly terminus-fonts umbriel-nightly noctalia gnome-keyring gnome-keyring-pam # login manager,wm,shell,keyring, ly font fix Lat2-Terminus16
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
     fuse fuse-libs # AppImage support
-    fastfetch usbutils git wget curl rsync #  tools
+    fastfetch usbutils git wget curl rsync chezmoi #  tools
     pipewire wireplumber alsa-utils  # Sound
     cups gutenprint gutenprint-cups sane-backends # Printer&Scanner for Canon e400 series
     fcitx5 fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram # fcitx5

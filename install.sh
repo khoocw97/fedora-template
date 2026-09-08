@@ -109,8 +109,8 @@ else
     while true; do
         read -p "Select 1/2: " nvidia_choice
         case "$nvidia_choice" in
-            1) dnf install -y akmod-nvidia-580xx nvidia-driver-580xx; color_echo "green" "-> NVIDIA 580 driver installed"; break ;;
-            2) dnf install -y akmod-nvidia nvidia-driver; color_echo "green" "-> NVIDIA latest driver installed"; break ;;
+            1) dnf install -y akmod-nvidia-580xx; color_echo "green" "-> NVIDIA 580 driver installed"; break ;;
+            2) dnf install -y akmod-nvidia; color_echo "green" "-> NVIDIA latest driver installed"; break ;;
             *) color_echo "red" "Invalid choice, please enter 1 or 2." ;;
         esac
     done

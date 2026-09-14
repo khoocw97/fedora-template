@@ -148,7 +148,8 @@ dnf install @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-
 color_echo "blue" "[5/5] Installing dnf packages..."
 
 BASE_PKGS=(
-    ly terminus-fonts umbriel-nightly noctalia gnome-keyring gnome-keyring-pam # login manager,wm,shell,keyring, ly font fix Lat2-Terminus16
+    make sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes umbriel-nightly noctalia gnome-keyring gnome-keyring-pam # login manager,wm,shell,keyring
+    adw-gtk3-theme qt5ct qt6ct # unified theme
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
     fuse fuse-libs # AppImage support
     fastfetch usbutils git wget curl rsync chezmoi #  tools

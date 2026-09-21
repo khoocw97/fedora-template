@@ -158,21 +158,66 @@ dnf install @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-
 # ---------------------------------------------------------------------
 color_echo "blue" "[5/5] Installing dnf packages..."
 
+# === Enable COPR ===
+COPR_REPOS=(
+    "lihaohong/yazi"
+    "imput/helium"
+    "khoocw97/software"
+)
+for repo in "${COPR_REPOS[@]}"; do
+    dnf copr enable "$repo" -y
+done
+
+# === Create Google-Chrome Repo ===
+tee /etc/yum.repos.d/google-chrome.repo > /dev/null << 'EOF'
+[google-chrome]
+name=google-chrome
+baseurl=https://dl.google.com/linux/chrome/rpm/stable/x86_64
+enabled=1
+gpgcheck=1
+gpgkey=https://dl.google.com/linux/linux_signing_key.pub
+EOF
+
+# === Enable Mega-CLI ===
+FEDORA_VERSION=$(rpm -E %fedora)
+dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megacmd-Fedora_${FEDORA_VERSION}.x86_64.rpm"
+
 BASE_PKGS=(
-    make sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes umbriel-nightly noctalia gnome-keyring gnome-keyring-pam # login manager,wm,shell,keyring
+    fastfetch usbutils git wget curl rsync chezmoi make #  tools
+    gnome-keyring gnome-keyring-pam # keyring
     adw-gtk3-theme qt5ct qt6ct # unified theme
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
     fuse fuse-libs # AppImage support
-    fastfetch usbutils git wget curl rsync chezmoi #  tools
     pipewire wireplumber alsa-utils  # Sound
     cups gutenprint gutenprint-cups sane-backends # Printer&Scanner for Canon e400 series
     fcitx5 fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram # fcitx5
+    maple-mono-fonts lxgw-fonts bibata-cursor-themes # from khoocw97's repo
 )
 dnf install -y "${BASE_PKGS[@]}"
 
-# --- Configure ly (TUI display manager, from fedora-niri) ---
-# Fresh install has no fedora-niri checkout, so embed service content directly
-if rpm -q ly >/dev/null 2>&1; then
+# --- Display manager: ly or sddm ---
+color_echo "blue" "Select display manager:"
+color_echo "blue" "[1] ly   : TUI login manager"
+color_echo "blue" "[2] sddm : Qt6 graphical login manager"
+while true; do
+    read -p "Select 1/2: " dm_choice
+    case "$dm_choice" in
+        1)
+            dnf install -y ly
+            color_echo "green" "-> ly installed"
+            break ;;
+        2)
+            dnf install -y sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes
+            systemctl enable sddm
+            color_echo "green" "-> sddm installed and enabled"
+            break ;;
+        *) color_echo "red" "Invalid choice, please enter 1 or 2." ;;
+    esac
+done
+
+# --- Configure ly ---
+# Skipped when sddm was chosen
+if [[ "$dm_choice" == "1" ]]; then
     mkdir -p /etc/ly
     tee /etc/systemd/system/ly.service > /dev/null <<'LYEOF'
 [Unit]
@@ -197,37 +242,39 @@ LYEOF
     systemctl enable ly.service
     systemctl disable getty@tty2.service 2>/dev/null || true
     color_echo "green" "-> ly enabled (TUI DM on tty2, getty@tty2 disabled)"
-else
-    color_echo "yellow" "-> ly not installed, skipping ly.service enable"
 fi
+
+# --- Compositor: niri or umbriel ---
+color_echo "blue" "Select compositor:"
+color_echo "blue" "[1] niri    : + noctalia shell"
+    color_echo "blue" "[2] umbriel : + noctalia shell"
+while true; do
+    read -p "Select 1/2: " wm_choice
+    case "$wm_choice" in
+        1)
+            dnf install -y niri noctalia xwayland-satellite --exclude=alacritty,waybar,mako,swaylock
+            tee /usr/share/xdg-desktop-portal/niri-portals.conf > /dev/null <<'PORTALEOF'
+[preferred]
+default=gnome;gtk;
+org.freedesktop.impl.portal.Access=gtk;
+org.freedesktop.impl.portal.FileChooser=gtk;
+org.freedesktop.impl.portal.Notification=gtk;
+org.freedesktop.impl.portal.Secret=gnome-keyring;
+PORTALEOF
+            color_echo "green" "-> niri + noctalia installed (GTK file chooser)"
+            break ;;
+        2)
+            dnf install -y umbriel noctalia xwayland-satellite
+            color_echo "green" "-> umbriel installed"
+            break ;;
+        *) color_echo "red" "Invalid choice, please enter 1 or 2." ;;
+    esac
+done
 
 # Add user to lp group
 usermod -aG lp "$ACTUAL_USER"
 # Enable Printer service
 systemctl enable --now cups
-
-# === Enable COPR ===
-COPR_REPOS=(
-    "lihaohong/yazi"
-    "imput/helium"
-)
-for repo in "${COPR_REPOS[@]}"; do
-    dnf copr enable "$repo" -y
-done
-
-# === Create Google-Chrome Repo ===
-tee /etc/yum.repos.d/google-chrome.repo > /dev/null << 'EOF'
-[google-chrome]
-name=google-chrome
-baseurl=https://dl.google.com/linux/chrome/rpm/stable/x86_64
-enabled=1
-gpgcheck=1
-gpgkey=https://dl.google.com/linux/linux_signing_key.pub
-EOF
-
-# === Enable Mega-CLI ===
-FEDORA_VERSION=$(rpm -E %fedora)
-dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megacmd-Fedora_${FEDORA_VERSION}.x86_64.rpm"
 
 # === Personal Software ===
 dnf makecache
@@ -263,7 +310,14 @@ FLATPAK_APPS=(
     "com.github.jeromerobert.pdfarranger"
     "org.localsend.localsend_app"
     "org.gnome.Loupe"
+    "io.github.diegopvlk.Cine"
     "com.github.flxzt.rnote"
+    "com.obsproject.Studio.Plugin.Gstreamer"
+    "com.obsproject.Studio.Plugin.GStreamerVaapi"
+    "io.github.kolunmi.Bazaar"
+    "io.github.flattool.Warehouse"
+    "io.missioncenter.MissionCenter"
+    "com.protonvpn.www"
 )
 # Install
 su - "$ACTUAL_USER" -c "flatpak install --user -y flathub ${FLATPAK_APPS[*]}"

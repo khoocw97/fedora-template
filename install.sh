@@ -63,7 +63,7 @@ color_echo "blue" "[3/5] Optimizing DNF configuration files..."
 if [ -f /etc/dnf/dnf.conf ]; then
     # dnf5-plugins provides copr/config-manager for dnf5 (Fedora 41+)
     dnf install -y dnf5-plugins
-    dnf config-manager setopt max_parallel_downloads=20 minrate=2M timeout=10
+    dnf config-manager setopt max_parallel_downloads=20 minrate=1M timeout=20
     color_echo "green" "-> Complete (parallel download=20)"
 else
     color_echo "red" "-> Error: /etc/dnf/dnf.conf configuration file not found!"
@@ -78,21 +78,21 @@ color_echo "blue" "[4/5] Enabling RPM Fusion and completing system multimedia de
 dnf install -y https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
 dnf install -y https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
 dnf install -y 'rpmfusion-*-appstream-data'
-dnf install -y --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
+# dnf install -y --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
 
 # --- Terra Mesa subrepo (optional) ---
-color_echo "blue" "Terra Mesa subrepo provides Mesa build with OGC patches and more features enabled (docs.terrapkg.com). "
-color_echo "blue" "Note: remove any mesa-*-freeworld from RPM Fusion before installing."
-read -p "Enable Terra Mesa subrepo (terra-release-mesa)? [y/N]: " enable_mesa
-if [[ "$enable_mesa" =~ ^[Yy]$ ]]; then
-    color_echo "blue" "-> Enabling terra-mesa..."
-    dnf install -y terra-release-mesa
-    color_echo "blue" "-> Upgrading from terra-mesa..."
-    dnf upgrade --repo=terra-mesa -y
-    color_echo "green" "-> Terra Mesa subrepo enabled and upgraded"
-else
-    color_echo "yellow" "-> Skipped Terra Mesa subrepo"
-fi
+# color_echo "blue" "Terra Mesa subrepo provides Mesa build with OGC patches and more features enabled (docs.terrapkg.com). "
+# color_echo "blue" "Note: remove any mesa-*-freeworld from RPM Fusion before installing."
+# read -p "Enable Terra Mesa subrepo (terra-release-mesa)? [y/N]: " enable_mesa
+# if [[ "$enable_mesa" =~ ^[Yy]$ ]]; then
+#     color_echo "blue" "-> Enabling terra-mesa..."
+#     dnf install -y terra-release-mesa
+#     color_echo "blue" "-> Upgrading from terra-mesa..."
+#     dnf upgrade --repo=terra-mesa -y
+#     color_echo "green" "-> Terra Mesa subrepo enabled and upgraded"
+# else
+#     color_echo "yellow" "-> Skipped Terra Mesa subrepo"
+# fi
 
 # --- lspci install ---
 command -v lspci >/dev/null 2>&1 || dnf install -y pciutils
@@ -106,17 +106,28 @@ else
     color_echo "blue" "Select NVIDIA driver branch:"
     color_echo "blue" "[1] driver-580: Maxwell and Pascal"
     color_echo "blue" "[2] latest    : Current GeForce/Quadro/Tesla"
+    NVIDIA_PKGS="nvidia-driver nvidia-settings nvidia-driver-cuda akmod-nvidia"
     while true; do
         read -p "Select 1/2: " nvidia_choice
         case "$nvidia_choice" in
-            1) dnf install -y akmod-nvidia-580xx; color_echo "green" "-> NVIDIA 580 driver installed"; break ;;
-            2) dnf install -y akmod-nvidia; color_echo "green" "-> NVIDIA latest driver installed"; break ;;
+            1)
+                dnf config-manager addrepo --from-repofile=https://negativo17.org/repos/fedora-nvidia-580.repo
+                dnf config-manager setopt fedora-nvidia-580.priority=90
+                color_echo "green" "-> NVIDIA 580 (LTS) repo enabled"
+                break ;;
+            2)
+                dnf config-manager addrepo --from-repofile=https://negativo17.org/repos/fedora-nvidia.repo
+                dnf config-manager setopt fedora-nvidia.priority=90
+                color_echo "green" "-> NVIDIA latest repo enabled"
+                break ;;
             *) color_echo "red" "Invalid choice, please enter 1 or 2." ;;
         esac
     done
+    color_echo "blue" "-> Installing NVIDIA driver and CUDA components..."
+    dnf install -y $NVIDIA_PKGS
     color_echo "blue" "-> Installing NVIDIA hardware acceleration..."
     dnf install -y libva-nvidia-driver
-    color_echo "green" "-> libva-nvidia-driver installed"
+    color_echo "green" "-> NVIDIA driver and libva-nvidia-driver installed"
 fi
 
 # --- Intel VAAPI driver ---
@@ -125,7 +136,7 @@ if [ -z "$intel_gpu_info" ]; then
     color_echo "yellow" "-> No Intel GPU detected, skipping Intel VAAPI driver prompt"
 else
     color_echo "blue" "Intel GPU detected: $intel_gpu_info"
-    color_echo "blue" "Select Intel VAAPI driver:"
+    color_echo "blue" "Select Intel VAAPI driver (hardware acceleration):"
     color_echo "blue" "[1] Older : 1st-4th Gen, HD 2000/3000/4000"
     color_echo "blue" "[2] Recent: 5th Gen+ / Core Ultra / Arc"
     while true; do

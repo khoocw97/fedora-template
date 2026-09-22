@@ -276,7 +276,7 @@ systemctl enable --now cups
 
 # === Personal Software ===
 dnf makecache
-dnf install -y firefox google-chrome-stable vlc yazi xournalpp helium-bin nemo kitty
+dnf install -y firefox google-chrome-stable vlc yazi xournalpp helium-bin nemo kitty kdeconnectd
 
 # === DVD Playback Support (optional) ===
 color_echo "blue" "DVD playback requires RPM Fusion tainted repository and libdvdcss (may be restricted in some countries per RPM Fusion: Tainted free is for FLOSS packages where usage might be restricted in some countries)."

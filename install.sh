@@ -78,21 +78,6 @@ color_echo "blue" "[4/5] Enabling RPM Fusion and completing system multimedia de
 dnf install -y https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
 dnf install -y https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
 dnf install -y 'rpmfusion-*-appstream-data'
-# dnf install -y --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
-
-# --- Terra Mesa subrepo (optional) ---
-# color_echo "blue" "Terra Mesa subrepo provides Mesa build with OGC patches and more features enabled (docs.terrapkg.com). "
-# color_echo "blue" "Note: remove any mesa-*-freeworld from RPM Fusion before installing."
-# read -p "Enable Terra Mesa subrepo (terra-release-mesa)? [y/N]: " enable_mesa
-# if [[ "$enable_mesa" =~ ^[Yy]$ ]]; then
-#     color_echo "blue" "-> Enabling terra-mesa..."
-#     dnf install -y terra-release-mesa
-#     color_echo "blue" "-> Upgrading from terra-mesa..."
-#     dnf upgrade --repo=terra-mesa -y
-#     color_echo "green" "-> Terra Mesa subrepo enabled and upgraded"
-# else
-#     color_echo "yellow" "-> Skipped Terra Mesa subrepo"
-# fi
 
 # --- lspci install ---
 command -v lspci >/dev/null 2>&1 || dnf install -y pciutils
@@ -106,7 +91,7 @@ else
     color_echo "blue" "Select NVIDIA driver branch:"
     color_echo "blue" "[1] driver-580: Maxwell and Pascal"
     color_echo "blue" "[2] latest    : Current GeForce/Quadro/Tesla"
-    NVIDIA_PKGS="nvidia-driver nvidia-settings nvidia-driver-cuda akmod-nvidia"
+    NVIDIA_PKGS="nvidia-driver nvidia-settings nvidia-driver-cuda akmod-nvidia nvidia-driver-libs.i686"
     while true; do
         read -p "Select 1/2: " nvidia_choice
         case "$nvidia_choice" in
@@ -130,6 +115,19 @@ else
     color_echo "green" "-> NVIDIA driver and libva-nvidia-driver installed"
 fi
 
+# --- AMD mesa freeworld (hardware-aware, lspci) ---
+amd_gpu_info=$(lspci 2>/dev/null | grep -i -E "amd|radeon" | grep -i -E "graphics|vga|display" || true)
+if [ -z "$amd_gpu_info" ]; then
+    color_echo "yellow" "-> No AMD GPU detected, skipping AMD mesa freeworld swap"
+else
+    color_echo "blue" "AMD GPU detected: $amd_gpu_info"
+    color_echo "blue" "-> Installing mesa freeworld drivers..."
+    dnf install -y mesa-va-drivers-freeworld mesa-va-drivers-freeworld.i686
+    dnf swap -y mesa-vulkan-drivers{,-freeworld}
+    dnf swap -y mesa-vulkan-drivers{,-freeworld}.i686
+    color_echo "green" "-> mesa freeworld installed"
+fi
+
 # --- Intel VAAPI driver ---
 intel_gpu_info=$(lspci 2>/dev/null | grep -i "intel" | grep -i -E "graphics|vga|display|arc" || true)
 if [ -z "$intel_gpu_info" ]; then
@@ -142,8 +140,8 @@ else
     while true; do
         read -p "Select 1/2: " intel_choice
         case "$intel_choice" in
-            1) dnf install -y libva-intel-driver; color_echo "green" "-> libva-intel-driver installed"; break ;;
-            2) dnf install -y intel-media-driver; color_echo "green" "-> intel-media-driver installed"; break ;;
+            1) dnf install -y libva-intel-driver libva-intel-driver.i686; color_echo "green" "-> libva-intel-driver installed"; break ;;
+            2) dnf install -y libva-intel-media-driver libva-intel-media-driver.i686; color_echo "green" "-> libva-intel-media-driver installed"; break ;;
             *) color_echo "red" "Invalid choice, please enter 1 or 2." ;;
         esac
     done
@@ -185,7 +183,7 @@ dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megac
 BASE_PKGS=(
     fastfetch usbutils git wget curl rsync chezmoi make #  tools
     gnome-keyring gnome-keyring-pam # keyring
-    adw-gtk3-theme qt5ct qt6ct # unified theme
+    adw-gtk3-theme qt5ct qt6ct kf6-qqc2-desktop-style # unified theme
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
     fuse fuse-libs # AppImage support
     pipewire wireplumber alsa-utils  # Sound
@@ -329,7 +327,7 @@ color_echo "green" "======================================================="
 color_echo "green" "Setup complete."
 color_echo "green" "======================================================="
 
-# 询问重启
+# --- Reboot ---
 read -p "Reboot(y/n): " reboot_choice
 if [[ $reboot_choice =~ ^[Yy]$ ]]; then
     color_echo "green" "Rebooting..."

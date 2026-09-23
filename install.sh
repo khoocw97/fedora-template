@@ -181,7 +181,7 @@ FEDORA_VERSION=$(rpm -E %fedora)
 dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megacmd-Fedora_${FEDORA_VERSION}.x86_64.rpm"
 
 BASE_PKGS=(
-    fastfetch usbutils git wget curl rsync chezmoi make #  tools
+    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make #  tools
     gnome-keyring gnome-keyring-pam # keyring
     adw-gtk3-theme qt5ct qt6ct kf6-qqc2-desktop-style # unified theme
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale

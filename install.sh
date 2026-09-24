@@ -183,7 +183,7 @@ dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megac
 BASE_PKGS=(
     ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make #  tools
     gnome-keyring gnome-keyring-pam # keyring
-    adw-gtk3-theme qt5ct qt6ct kf6-qqc2-desktop-style # unified theme
+    adw-gtk3-theme qt5ct qt6ct # unified theme
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
     fuse fuse-libs # AppImage support
     pipewire wireplumber alsa-utils  # Sound
@@ -193,54 +193,10 @@ BASE_PKGS=(
 )
 dnf install -y "${BASE_PKGS[@]}"
 
-# --- Display manager: ly or sddm ---
-color_echo "blue" "Select display manager:"
-color_echo "blue" "[1] ly   : TUI login manager"
-color_echo "blue" "[2] sddm : Qt6 graphical login manager"
-while true; do
-    read -p "Select 1/2: " dm_choice
-    case "$dm_choice" in
-        1)
-            dnf install -y ly
-            color_echo "green" "-> ly installed"
-            break ;;
-        2)
-            dnf install -y sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes
-            systemctl enable sddm
-            color_echo "green" "-> sddm installed and enabled"
-            break ;;
-        *) color_echo "red" "Invalid choice, please enter 1 or 2." ;;
-    esac
-done
-
-# --- Configure ly ---
-# Skipped when sddm was chosen
-if [[ "$dm_choice" == "1" ]]; then
-    mkdir -p /etc/ly
-    tee /etc/systemd/system/ly.service > /dev/null <<'LYEOF'
-[Unit]
-Description=TUI display manager
-After=systemd-user-sessions.service plymouth-quit-wait.service
-After=getty@tty2.service
-
-[Service]
-Type=idle
-ExecStartPre=/usr/bin/printf '%%b' '\e]P011121D\e]P7A9B1D6\ec'
-ExecStartPre=-/usr/bin/setfont -C /dev/tty2 Lat2-Terminus16
-ExecStart=/usr/bin/ly
-StandardInput=tty
-TTYPath=/dev/tty2
-TTYReset=yes
-TTYVHangup=yes
-
-[Install]
-WantedBy=multi-user.target
-LYEOF
-    systemctl daemon-reload
-    systemctl enable ly.service
-    systemctl disable getty@tty2.service 2>/dev/null || true
-    color_echo "green" "-> ly enabled (TUI DM on tty2, getty@tty2 disabled)"
-fi
+# --- Display manager: sddm ---
+dnf install -y sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes
+systemctl enable sddm
+color_echo "green" "-> sddm installed"
 
 # --- Compositor: niri or umbriel ---
 color_echo "blue" "Select compositor:"

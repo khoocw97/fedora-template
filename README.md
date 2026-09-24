@@ -35,9 +35,7 @@ sudo ./install.sh
    
    - Base tools, keyring, themes, Flatpak, locales, AppImage (`fuse`), PipeWire, printing (Canon e400), fcitx5+rime, fonts (`maple-mono`, `lxgw`, `bibata`)
    
-   - **Display manager**:
-   > - `ly` on tty2
-   > - `sddm`
+    - **Display manager**: `sddm`
 
    - **Compositor**: 
    > - `niri` + `noctalia` + `xwayland-satellite` (excludes `alacritty/waybar/mako/swaylock`; writes `niri-portals.conf` with GTK file chooser for `nemo`) 

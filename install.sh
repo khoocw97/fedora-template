@@ -196,6 +196,7 @@ dnf install -y "${BASE_PKGS[@]}"
 # --- Display manager: sddm ---
 dnf install -y sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes
 systemctl enable sddm
+systemctl set-default graphical.target
 color_echo "green" "-> sddm installed"
 
 # --- Compositor: niri or umbriel ---

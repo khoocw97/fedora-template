@@ -42,9 +42,9 @@ sudo ./install.sh
    > - `umbriel` + `noctalia` + `xwayland-satellite`
 
    - Personal RPMs: 
-   > - `google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine`
+   > - `google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine onlyoffice-desktopeditors`
    - Editor: [Zed](https://zed.dev) (official installer, per-user)
    - AI: [opencode](https://opencode.ai) (official installer, per-user)
    - Optional DVD support (`libdvdcss`, tainted repo)
    - Flatpak (per-user Flathub): 
-   > - `Firefox, OnlyOffice, OBS (+Gstreamer/VAAPI plugins), Flatseal, Gearlever, pdfarranger, LocalSend, Loupe, Cine, Rnote, Bazaar, Warehouse, MissionCenter, ProtonVPN`
+   > - `Firefox, OBS (+Gstreamer/VAAPI plugins), Flatseal, Gearlever, pdfarranger, LocalSend, Loupe, Cine, Rnote, Bazaar, Warehouse, MissionCenter, ProtonVPN`

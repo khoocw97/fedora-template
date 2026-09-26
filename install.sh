@@ -24,6 +24,8 @@ color_echo() {
 
 # Basic variable definition
 ACTUAL_USER=${SUDO_USER:-$(logname 2>/dev/null)}
+# Directory of this script, so the config/ service/ script/ folders work from any CWD
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "╔═══════════════════════════════════════════════════════════════╗"
 echo "║             FEDORA SYSTEM INTEGRATED SETUP SCRIPT             ║"
@@ -168,19 +170,19 @@ for repo in "${COPR_REPOS[@]}"; do
     dnf copr enable "$repo" -y
 done
 
-# === Create Google-Chrome Repo ===
-tee /etc/yum.repos.d/google-chrome.repo > /dev/null << 'EOF'
-[google-chrome]
-name=google-chrome
-baseurl=https://dl.google.com/linux/chrome/rpm/stable/x86_64
-enabled=1
-gpgcheck=1
-gpgkey=https://dl.google.com/linux/linux_signing_key.pub
-EOF
+# === Install config files (config/ mirrors /) ===
+if [ -d "$SCRIPT_DIR/config" ]; then
+    color_echo "blue" "-> Installing config files..."
+    cp -r "$SCRIPT_DIR/config/." /
+    color_echo "green" "-> Config files installed"
+fi
 
 # === Enable Mega-CLI ===
 FEDORA_VERSION=$(rpm -E %fedora)
 dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megacmd-Fedora_${FEDORA_VERSION}.x86_64.rpm"
+
+# === Install OnlyOffice DesktopEditors (official RPM) ===
+dnf install -y https://github.com/ONLYOFFICE/DesktopEditors/releases/latest/download/onlyoffice-desktopeditors.x86_64.rpm
 
 BASE_PKGS=(
     ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make starship ripgrep fd-find zoxide eza fzf bat tealdeer duf #  tools
@@ -193,6 +195,7 @@ BASE_PKGS=(
     cups gutenprint gutenprint-cups sane-backends # Printer&Scanner for Canon e400 series
     fcitx5 fcitx5-chinese-addons fcitx5-configtool fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram # fcitx5
     bibata-cursor-themes papirus-icon # from khoocw97's repo
+    udiskie # auto-mount external drives (unit in service/user)
 )
 dnf install -y "${BASE_PKGS[@]}"
 
@@ -210,26 +213,41 @@ dnf install -y --setopt=install_weak_deps=False "${FONT_PKGS[@]}"
 dnf remove -y ibus ibus-anthy ibus-anthy-python ibus-chewing ibus-gtk3 ibus-gtk4 ibus-hangul \
     ibus-libpinyin ibus-libs ibus-m17n ibus-setup ibus-typing-booster python3-ibus 2>/dev/null || true
 
-# --- udiskie: auto-mount external drives (user service) ---
-dnf install -y udiskie
-install -d /etc/systemd/user
-tee /etc/systemd/user/udiskie.service > /dev/null <<'UDISKIEEOF'
-[Unit]
-Description=Auto-mount external drives (udiskie)
-After=graphical-session.target
-PartOf=graphical-session.target
+# === Install services (service/system -> /etc/systemd/system, service/user -> /etc/systemd/user) ===
+if [ -d "$SCRIPT_DIR/service" ]; then
+    color_echo "blue" "-> Installing services..."
+    if [ -d "$SCRIPT_DIR/service/system" ]; then
+        install -d /etc/systemd/system
+        cp -r "$SCRIPT_DIR/service/system/." /etc/systemd/system/
+        for unit in "$SCRIPT_DIR"/service/system/*.service; do
+            [ -f "$unit" ] || continue
+            systemctl enable "$(basename "$unit")"
+        done
+    fi
+    if [ -d "$SCRIPT_DIR/service/user" ]; then
+        install -d /etc/systemd/user
+        cp -r "$SCRIPT_DIR/service/user/." /etc/systemd/user/
+        for unit in "$SCRIPT_DIR"/service/user/*.service; do
+            [ -f "$unit" ] || continue
+            systemctl --global enable "$(basename "$unit")"
+        done
+    fi
+    systemctl daemon-reload
+    color_echo "green" "-> Services installed"
+fi
 
-[Service]
-Type=simple
-ExecStart=/usr/bin/udiskie
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=graphical-session.target
-UDISKIEEOF
-systemctl --global enable udiskie.service
-color_echo "green" "-> udiskie user service enabled"
+# === Run scripts (script/) ===
+if [ -d "$SCRIPT_DIR/script" ]; then
+    for s in "$SCRIPT_DIR"/script/*; do
+        [ -f "$s" ] || continue
+        read -p "Run $(basename "$s")? [y/N]: " run_script
+        if [[ "$run_script" =~ ^[Yy]$ ]]; then
+            su - "$ACTUAL_USER" -c "bash \"$s\""
+        else
+            color_echo "yellow" "-> Skipped $(basename "$s")"
+        fi
+    done
+fi
 
 # --- Display manager: sddm ---
 dnf install -y sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes
@@ -246,57 +264,10 @@ if git clone --depth=1 https://github.com/khoocw97/simple-sddm.git "$SDDM_TMP"; 
     install -m 644 "$SDDM_TMP/metadata.desktop" "$SDDM_TMP/Main.qml" "$SDDM_THEME_DIR"/
     install -m 644 "$SDDM_TMP/preview/preview1.png" "$SDDM_THEME_DIR"/preview.png
 
-    # Custom theme config lives in /etc; symlink it into the theme dir
-    install -d /etc/sddm/themes/simple-sddm
-    tee /etc/sddm/themes/simple-sddm/theme.conf > /dev/null <<'SDDMEOF'
-[General]
-# background=#0a0a0a  |  background=background.jpg  |  background=/usr/share/backgrounds/default.jpg
-# TokyoNight Night #1a1b26 / Storm #24283b / Moon #222436
-background=#13282b
-
-# date / clock
-showDate=true
-dateFormat=dddd dd/MM/yyyy
-showClock=true
-clock12hr=true
-clockSeconds=true
-
-# box
-hideBorders=false
-boxBackground=true
-boxBackgroundColor=#233b3f
-
-# function key,
-# show do not disable key, just not showing it
-showShutdownKey=true
-shutdownKey=F1
-showRebootKey=true
-rebootKey=F2
-showPasswordToggleKey=true
-passwordToggleKey=F7
-
-# font
-fontFamily=
-fontSize=15
-boxFontSize=15
-
-# primaryScreen: empty=show on all (default) | eDP-1/HDMI-A-1=only that output (exact, case-sensitive), unknown falls back to system primary screen
-primaryScreen=
-
-# session / user / password
-defaultInput=password
-
-# input length (box width based on inputLen)
-inputLen=20
-
-# default show nothing,linux style, this echoes * per character
-asterisk=*
-SDDMEOF
+    # Theme config comes from config/; symlink it into the theme dir
     ln -sf /etc/sddm/themes/simple-sddm/theme.conf "$SDDM_THEME_DIR/theme.conf"
 
-    # Select theme (comment any stale Current= in /etc/sddm.conf, it overrides sddm.conf.d)
-    install -d /etc/sddm.conf.d
-    printf '[Theme]\nCurrent=simple-sddm\n' > /etc/sddm.conf.d/10-simple-sddm.conf
+    # Comment any stale Current= in /etc/sddm.conf, it overrides sddm.conf.d
     [ -f /etc/sddm.conf ] && sed -i 's/^[[:space:]]*Current[[:space:]]*=/#&/' /etc/sddm.conf
 
     color_echo "green" "-> simple-sddm theme installed"
@@ -314,14 +285,7 @@ while true; do
     case "$wm_choice" in
         1)
             dnf install -y niri noctalia xwayland-satellite --exclude=alacritty,waybar,mako,swaylock
-            tee /usr/share/xdg-desktop-portal/niri-portals.conf > /dev/null <<'PORTALEOF'
-[preferred]
-default=gnome;gtk;
-org.freedesktop.impl.portal.Access=gtk;
-org.freedesktop.impl.portal.FileChooser=gtk;
-org.freedesktop.impl.portal.Notification=gtk;
-org.freedesktop.impl.portal.Secret=gnome-keyring;
-PORTALEOF
+            # Portal config comes from config/
             color_echo "green" "-> niri + noctalia installed (GTK file chooser)"
             break ;;
         2)
@@ -375,7 +339,6 @@ su - "$ACTUAL_USER" -c "flatpak remote-add --user --if-not-exists flathub https:
 # Define the list of Flatpak software to be installed.
 FLATPAK_APPS=(
     "org.mozilla.firefox"
-    "org.onlyoffice.desktopeditors"
     "com.obsproject.Studio"
     "com.github.tchx84.Flatseal"
     "it.mijorus.gearlever"
@@ -389,6 +352,7 @@ FLATPAK_APPS=(
     "io.github.kolunmi.Bazaar"
     "io.github.flattool.Warehouse"
     "io.missioncenter.MissionCenter"
+    "org.desktop_plus.desktop-plus"
     "com.protonvpn.www"
 )
 # Install

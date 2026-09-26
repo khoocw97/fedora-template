@@ -34,7 +34,7 @@ install_deps() {
         librime-octagram
 }
 
-# 准备 Plum 工具（参考 setup-rime）
+# 准备 Plum 工具
 clone_plum() {
     TMP_DIR=$(mktemp -d)
     if ! git clone https://github.com/rime/plum.git "$TMP_DIR/plum"; then
@@ -44,9 +44,8 @@ clone_plum() {
     fi
 }
 
-# 安装/更新 雾凇拼音（全拼）
-install_rime() {
-    install_deps
+# 拉取并安装 雾凇拼音（全拼）
+apply_rime() {
     clone_plum || return 1
     cd "$TMP_DIR/plum"
 
@@ -70,17 +69,29 @@ install_rime() {
     echo "如果失败，请右键点击系统托盘的 Fcitx 5 图标，选择「重新部署 (Deploy)」或「重启」使其生效。"
 }
 
+# 安装（含依赖）
+install_rime() {
+    install_deps
+    apply_rime
+}
+
+# 更新
+update_rime() {
+    apply_rime
+}
+
 ACTION="${1:-}"
 if [[ -z "$ACTION" ]]; then
     echo "Rime 配置"
     PS3="请选择: "
-    select ACTION in "安装/更新" "删除rime文件夹" "退出"; do
+    select ACTION in "安装" "更新" "删除rime文件夹" "退出"; do
         [[ -n "$ACTION" ]] && break
     done
 fi
 
 case "$ACTION" in
-    "安装/更新"|安装|更新) install_rime ;;
+    安装) install_rime ;;
+    更新) update_rime ;;
     "删除rime文件夹"|删除) 删除rime文件夹 ;;
     *) echo "没有更改。" ;;
 esac

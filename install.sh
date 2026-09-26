@@ -199,6 +199,74 @@ systemctl enable sddm
 systemctl set-default graphical.target
 color_echo "green" "-> sddm installed"
 
+# --- SDDM theme: simple-sddm ---
+color_echo "blue" "-> Installing simple-sddm theme..."
+SDDM_THEME_DIR=/usr/share/sddm/themes/simple-sddm
+SDDM_TMP=$(mktemp -d)
+if git clone --depth=1 https://github.com/khoocw97/simple-sddm.git "$SDDM_TMP"; then
+    install -d "$SDDM_THEME_DIR"
+    install -m 644 "$SDDM_TMP/metadata.desktop" "$SDDM_TMP/Main.qml" "$SDDM_THEME_DIR"/
+    install -m 644 "$SDDM_TMP/preview/preview1.png" "$SDDM_THEME_DIR"/preview.png
+
+    # Custom theme config lives in /etc; symlink it into the theme dir
+    install -d /etc/sddm/themes/simple-sddm
+    tee /etc/sddm/themes/simple-sddm/theme.conf > /dev/null <<'SDDMEOF'
+[General]
+# background=#0a0a0a  |  background=background.jpg  |  background=/usr/share/backgrounds/default.jpg
+# TokyoNight Night #1a1b26 / Storm #24283b / Moon #222436
+background=#13282b
+
+# date / clock
+showDate=true
+dateFormat=dddd dd/MM/yyyy
+showClock=true
+clock12hr=true
+clockSeconds=true
+
+# box
+hideBorders=false
+boxBackground=true
+boxBackgroundColor=#233b3f
+
+# function key,
+# show do not disable key, just not showing it
+showShutdownKey=true
+shutdownKey=F1
+showRebootKey=true
+rebootKey=F2
+showPasswordToggleKey=true
+passwordToggleKey=F7
+
+# font
+fontFamily=
+fontSize=15
+boxFontSize=15
+
+# primaryScreen: empty=show on all (default) | eDP-1/HDMI-A-1=only that output (exact, case-sensitive), unknown falls back to system primary screen
+primaryScreen=
+
+# session / user / password
+defaultInput=password
+
+# input length (box width based on inputLen)
+inputLen=20
+
+# default show nothing,linux style, this echoes * per character
+asterisk=*
+SDDMEOF
+    ln -sf /etc/sddm/themes/simple-sddm/theme.conf "$SDDM_THEME_DIR/theme.conf"
+
+    # Select theme (comment any stale Current= in /etc/sddm.conf, it overrides sddm.conf.d)
+    install -d /etc/sddm.conf.d
+    printf '[Theme]\nCurrent=simple-sddm\n' > /etc/sddm.conf.d/10-simple-sddm.conf
+    [ -f /etc/sddm.conf ] && sed -i 's/^[[:space:]]*Current[[:space:]]*=/#&/' /etc/sddm.conf
+
+    color_echo "green" "-> simple-sddm theme installed"
+else
+    color_echo "red" "-> Failed to clone simple-sddm, theme not installed"
+fi
+rm -rf "$SDDM_TMP"
+
 # --- Compositor: niri or umbriel ---
 color_echo "blue" "Select compositor:"
 color_echo "blue" "[1] niri    : + noctalia shell"

@@ -3,50 +3,84 @@ set -euo pipefail
 
 # 定义 Fcitx 5 的 Rime 用户目录
 RIME_DIR="$HOME/.local/share/fcitx5/rime"
-# 清除文件夹
-rm -rf ~/.config/fcitx5/rime
 
-echo "==== 0. 检查并安装 Fcitx5/Rime 依赖 (Fedora) ===="
-if ! command -v dnf &>/dev/null; then
-    echo "错误: 未检测到 dnf，仅支持 Fedora"
-    exit 1
+# 删除 rime 文件夹
+function 删除rime文件夹() {
+    rm -rf ~/.config/fcitx5/rime
+    echo "已删除 rime 文件夹"
+}
+
+# 重新部署 rime（参考 fedora-niri setup-rime）
+deploy_rime() {
+    busctl --user call org.fcitx.Fcitx5 /controller org.fcitx.Fcitx.Controller1 SetConfig sv "fcitx://config/addon/rime/deploy" s "" >/dev/null 2>&1 || true
+}
+
+# 检查并安装 Fcitx5/Rime 依赖 (Fedora)
+install_deps() {
+    echo "==== 检查并安装 Fcitx5/Rime 依赖 (Fedora) ===="
+    if ! command -v dnf &>/dev/null; then
+        echo "错误: 未检测到 dnf，仅支持 Fedora"
+        exit 1
+    fi
+    echo "安装依赖..."
+    sudo dnf install -y \
+        fcitx5 \
+        fcitx5-chinese-addons \
+        fcitx5-rime \
+        fcitx5-gtk \
+        fcitx5-qt \
+        fcitx5-configtool \
+        librime-lua \
+        librime-octagram
+}
+
+# 准备 Plum 工具（参考 setup-rime）
+clone_plum() {
+    TMP_DIR=$(mktemp -d)
+    if ! git clone https://github.com/rime/plum.git "$TMP_DIR/plum"; then
+        rm -rf "$TMP_DIR"
+        echo "Git 拉取失败，请检查网络后重试，未更改现有配置"
+        return 1
+    fi
+}
+
+# 安装/更新 雾凇拼音（全拼）
+install_rime() {
+    install_deps
+    clone_plum || return 1
+    cd "$TMP_DIR/plum"
+
+    echo -e "\n==== 1. 开始安装/更新 雾凇拼音 (全拼) ===="
+    rime_dir="$RIME_DIR" bash rime-install iDvel/rime-ice
+
+    echo -e "\n==== 2. 开始安装 万象语法模型 (全拼) ===="
+    rime_dir="$RIME_DIR" bash rime-install iDvel/rime-ice:others/recipes/grammar:schema=rime_ice
+
+    rm -rf "$TMP_DIR"
+
+    echo -e "\n==== 3. 正在重新部署 Fcitx 5 ===="
+    if pgrep -x "fcitx5" > /dev/null; then
+        deploy_rime
+        echo "已成功向 Fcitx 5 发送重新部署指令！"
+    else
+        echo "提示：未检测到正在运行的 fcitx5 进程，下次启动时将自动加载新配置。"
+    fi
+
+    echo -e "\n==== 安装完成！ ===="
+    echo "如果失败，请右键点击系统托盘的 Fcitx 5 图标，选择「重新部署 (Deploy)」或「重启」使其生效。"
+}
+
+ACTION="${1:-}"
+if [[ -z "$ACTION" ]]; then
+    echo "Rime 配置"
+    PS3="请选择: "
+    select ACTION in "安装/更新" "删除rime文件夹" "退出"; do
+        [[ -n "$ACTION" ]] && break
+    done
 fi
 
-echo "安装依赖..."
-sudo dnf install -y \
-    fcitx5 \
-    fcitx5-chinese-addons \
-    fcitx5-rime \
-    fcitx5-gtk \
-    fcitx5-qt \
-    fcitx5-configtool \
-    librime-lua \
-    librime-octagram
-
-echo "==== 1. 准备 Plum 工具 ===="
-cd ~
-if [ -d "plum" ]; then
-    echo "Plum 目录已存在，正在更新..."
-    cd plum && git pull && cd ..
-else
-    echo "正在克隆 Plum 仓库..."
-    git clone https://github.com/rime/plum.git plum
-fi
-
-echo -e "\n==== 2. 开始安装/更新 雾凇拼音 (全拼) ===="
-cd ~/plum
-rime_dir="$RIME_DIR" bash rime-install iDvel/rime-ice
-
-echo -e "\n==== 3. 开始安装 万象语法模型 (全拼) ===="
-rime_dir="$RIME_DIR" bash rime-install iDvel/rime-ice:others/recipes/grammar:schema=rime_ice
-
-echo -e "\n==== 4. 正在自动重新部署 Fcitx 5 ===="
-if pgrep -x "fcitx5" > /dev/null; then
-    fcitx5-remote -r
-    echo "已成功向 Fcitx 5 发送重新部署指令！"
-else
-    echo "提示：未检测到正在运行的 fcitx5 进程，下次启动时将自动加载新配置。"
-fi
-
-echo -e "\n==== 安装完成！ ===="
-echo "请右键点击系统托盘的 Fcitx 5 图标，选择「重新部署 (Deploy)」或「重启」使其生效。"
+case "$ACTION" in
+    "安装/更新"|安装|更新) install_rime ;;
+    "删除rime文件夹"|删除) 删除rime文件夹 ;;
+    *) echo "没有更改。" ;;
+esac

@@ -161,6 +161,8 @@ COPR_REPOS=(
     "lihaohong/yazi"
     "imput/helium"
     "khoocw97/software"
+    "lizardbyte/stable"  # sunshine
+    "atim/starship"      # starship prompt
 )
 for repo in "${COPR_REPOS[@]}"; do
     dnf copr enable "$repo" -y
@@ -181,17 +183,53 @@ FEDORA_VERSION=$(rpm -E %fedora)
 dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megacmd-Fedora_${FEDORA_VERSION}.x86_64.rpm"
 
 BASE_PKGS=(
-    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make #  tools
+    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make starship ripgrep fd-find zoxide eza fzf bat tealdeer duf #  tools
     gnome-keyring gnome-keyring-pam # keyring
     adw-gtk3-theme qt5ct qt6ct # unified theme
+    xdg-user-dirs power-profiles-daemon # xdg user dirs / power profiles
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
     fuse fuse-libs # AppImage support
     pipewire wireplumber alsa-utils  # Sound
     cups gutenprint gutenprint-cups sane-backends # Printer&Scanner for Canon e400 series
-    fcitx5 fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram # fcitx5
-    maple-mono-fonts lxgw-fonts bibata-cursor-themes # from khoocw97's repo
+    fcitx5 fcitx5-chinese-addons fcitx5-configtool fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram # fcitx5
+    bibata-cursor-themes papirus-icon # from khoocw97's repo
 )
 dnf install -y "${BASE_PKGS[@]}"
+
+# --- Fonts & locale (no weak deps) ---
+FONT_PKGS=(
+    default-fonts default-fonts-core-emoji default-fonts-cjk-sans
+    google-noto-color-emoji-fonts google-noto-emoji-fonts google-noto-sans-cjk-vf-fonts
+    fira-code-fonts glibc-all-langpacks
+    langpacks-zh_CN langpacks-zh_TW langpacks-core-zh_CN langpacks-core-zh_TW langpacks-fonts-zh_CN langpacks-fonts-zh_TW
+    maple-mono-fonts lxgw-fonts # from khoocw97's repo
+)
+dnf install -y --setopt=install_weak_deps=False "${FONT_PKGS[@]}"
+
+# --- Switch input method from ibus to fcitx5 ---
+dnf remove -y ibus ibus-anthy ibus-anthy-python ibus-chewing ibus-gtk3 ibus-gtk4 ibus-hangul \
+    ibus-libpinyin ibus-libs ibus-m17n ibus-setup ibus-typing-booster python3-ibus 2>/dev/null || true
+
+# --- udiskie: auto-mount external drives (user service) ---
+dnf install -y udiskie
+install -d /etc/systemd/user
+tee /etc/systemd/user/udiskie.service > /dev/null <<'UDISKIEEOF'
+[Unit]
+Description=Auto-mount external drives (udiskie)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/udiskie
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
+UDISKIEEOF
+systemctl --global enable udiskie.service
+color_echo "green" "-> udiskie user service enabled"
 
 # --- Display manager: sddm ---
 dnf install -y sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes
@@ -270,7 +308,7 @@ rm -rf "$SDDM_TMP"
 # --- Compositor: niri or umbriel ---
 color_echo "blue" "Select compositor:"
 color_echo "blue" "[1] niri    : + noctalia shell"
-    color_echo "blue" "[2] umbriel : + noctalia shell"
+color_echo "blue" "[2] umbriel : + noctalia shell"
 while true; do
     read -p "Select 1/2: " wm_choice
     case "$wm_choice" in
@@ -287,7 +325,7 @@ PORTALEOF
             color_echo "green" "-> niri + noctalia installed (GTK file chooser)"
             break ;;
         2)
-            dnf install -y umbriel noctalia xwayland-satellite
+            dnf install -y umbriel noctalia xwayland-satellite xdg-desktop-portal-umbriel
             color_echo "green" "-> umbriel installed"
             break ;;
         *) color_echo "red" "Invalid choice, please enter 1 or 2." ;;
@@ -301,7 +339,17 @@ systemctl enable --now cups
 
 # === Personal Software ===
 dnf makecache
-dnf install -y firefox google-chrome-stable vlc yazi xournalpp helium-bin nemo kitty kdeconnectd
+dnf install -y google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine
+
+# === Zed editor (official installer, per-user) ===
+color_echo "blue" "-> Installing Zed editor for $ACTUAL_USER..."
+su - "$ACTUAL_USER" -c "curl -f https://zed.dev/install.sh | sh"
+color_echo "green" "-> Zed installed"
+
+# === opencode (official installer, per-user) ===
+color_echo "blue" "-> Installing opencode for $ACTUAL_USER..."
+su - "$ACTUAL_USER" -c "curl -fsSL https://opencode.ai/v2/install | bash"
+color_echo "green" "-> opencode installed"
 
 # === DVD Playback Support (optional) ===
 color_echo "blue" "DVD playback requires RPM Fusion tainted repository and libdvdcss (may be restricted in some countries per RPM Fusion: Tainted free is for FLOSS packages where usage might be restricted in some countries)."
@@ -326,6 +374,7 @@ su - "$ACTUAL_USER" -c "flatpak remote-add --user --if-not-exists flathub https:
 
 # Define the list of Flatpak software to be installed.
 FLATPAK_APPS=(
+    "org.mozilla.firefox"
     "org.onlyoffice.desktopeditors"
     "com.obsproject.Studio"
     "com.github.tchx84.Flatseal"

@@ -35,14 +35,16 @@ sudo ./install.sh
    
    - Base tools, keyring, themes, Flatpak, locales, AppImage (`fuse`), PipeWire, printing (Canon e400), fcitx5+rime, fonts (`maple-mono`, `lxgw`, `bibata`)
    
-    - **Display manager**: `sddm`
+    - **Display manager**: `sddm` with the [simple-sddm](https://github.com/khoocw97/simple-sddm) TUI theme
 
    - **Compositor**: 
    > - `niri` + `noctalia` + `xwayland-satellite` (excludes `alacritty/waybar/mako/swaylock`; writes `niri-portals.conf` with GTK file chooser for `nemo`) 
    > - `umbriel` + `noctalia` + `xwayland-satellite`
 
    - Personal RPMs: 
-   > - `firefox google-chrome-stable vlc yazi xournalpp helium-bin nemo kitty`
+   > - `google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine`
+   - Editor: [Zed](https://zed.dev) (official installer, per-user)
+   - AI: [opencode](https://opencode.ai) (official installer, per-user)
    - Optional DVD support (`libdvdcss`, tainted repo)
    - Flatpak (per-user Flathub): 
-   > - `OnlyOffice, OBS (+Gstreamer/VAAPI plugins), Flatseal, Gearlever, pdfarranger, LocalSend, Loupe, Cine, Rnote, Bazaar, Warehouse, MissionCenter, ProtonVPN`
+   > - `Firefox, OnlyOffice, OBS (+Gstreamer/VAAPI plugins), Flatseal, Gearlever, pdfarranger, LocalSend, Loupe, Cine, Rnote, Bazaar, Warehouse, MissionCenter, ProtonVPN`

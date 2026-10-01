@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Firewall rules for KDE Connect and LocalSend.
+for zone in home public; do
+  # KDE Connect (1714-1764/tcp+udp)
+  sudo firewall-offline-cmd --zone="$zone" --add-service=kdeconnect
+  # LocalSend (53317/tcp+udp)
+  sudo firewall-offline-cmd --zone="$zone" --add-port=53317/tcp
+  sudo firewall-offline-cmd --zone="$zone" --add-port=53317/udp
+done

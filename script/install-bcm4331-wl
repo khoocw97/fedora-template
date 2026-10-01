@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# MacBookPro 2012
+# 檢測方法 (來自 ArchWiki Broadcom wireless #Driver selection):
+#   lspci -vnn -d 14e4:  -> 比對 device ID / chipset
+set -euo pipefail
+
+TARGET_PCI="14e4:4331"   # BCM4331 802.11a/b/g/n
+TARGET_PRODUCTS="MacBookPro9,1 MacBookPro9,2 MacBookPro10,1 MacBookPro10,2"
+
+log() { printf '[*] %s\n' "$*"; }
+skip() { printf '[SKIP] %s\n' "$*"; exit 0; }
+
+# 1. 讀 DMI (Mac 型號)
+SYS_VENDOR="$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null || echo unknown)"
+PRODUCT="$(cat /sys/class/dmi/id/product_name 2>/dev/null || echo unknown)"
+log "DMI: vendor=$SYS_VENDOR product=$PRODUCT"
+
+# 2. 讀 PCI (Broadcom 網卡)，優先 lspci，缺 lspci 時掃 /sys/bus/pci
+PCI_LIST=""
+if command -v lspci >/dev/null 2>&1; then
+  PCI_LIST="$(lspci -nn -d 14e4: 2>/dev/null || true)"
+else
+  for uevent in /sys/bus/pci/devices/*/uevent; do
+    # shellcheck disable=SC1090
+    PCI_ID="$( (source "$uevent" 2>/dev/null; printf '%s' "$PCI_ID") || true)"
+    PCI_LIST+="$PCI_ID"$'\n'
+  done
+fi
+log "PCI(14e4):"
+printf '%s\n' "${PCI_LIST:-<empty>}"
+
+# 3. 判定是否為目標 Mac
+is_target_product=0
+for p in $TARGET_PRODUCTS; do
+  [[ "$PRODUCT" == "$p" ]] && is_target_product=1 && break
+done
+
+has_target_pci=0
+printf '%s' "$PCI_LIST" | grep -qiE "(^|[^0-9a-f])$TARGET_PCI([^0-9a-f]|$)" && has_target_pci=1 || true
+
+if [[ "$SYS_VENDOR" != *"Apple"* ]]; then
+  skip "非 Apple 硬體 ($SYS_VENDOR)，不安装。"
+fi
+if [[ $is_target_product -eq 0 ]]; then
+  skip "非 MacBookPro 2012 ($PRODUCT)，不安装。目標: $TARGET_PRODUCTS"
+fi
+if [[ $has_target_pci -eq 0 ]]; then
+  skip "未偵測到 BCM4331 [$TARGET_PCI]，不安装。"
+fi
+
+log "命中: $PRODUCT + BCM4331 [$TARGET_PCI]，繼續安裝流程."
+
+# 4. 已安装則跳過 (wl 已可用)
+if modinfo wl >/dev/null 2>&1 && lspci -k -d 14e4:4331 2>/dev/null | grep -q "Kernel driver in use: wl"; then
+  skip "wl 已在使用中，無需重装。"
+fi
+
+# 5. 安装
+log "安装 broadcom-wl"
+if ! rpm -q broadcom-wl >/dev/null 2>&1; then
+  sudo dnf install -y broadcom-wl
+else
+  log "broadcom-wl 已安装，跳過 dnf。"
+fi
+log "broadcom-wl 安装完成。"

@@ -191,11 +191,12 @@ BASE_PKGS=(
     xdg-user-dirs power-profiles-daemon # xdg user dirs / power profiles
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
     fuse fuse-libs # AppImage support
-    pipewire wireplumber alsa-utils  # Sound
+    pipewire wireplumber alsa-utils pulseaudio-utils  # Sound
     cups gutenprint gutenprint-cups sane-backends # Printer&Scanner for Canon e400 series
     fcitx5 fcitx5-chinese-addons fcitx5-configtool fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram # fcitx5
     bibata-cursor-themes papirus-icon # from khoocw97's repo
     udiskie # auto-mount external drives (unit in service/user)
+    zram-generator # zram swap (config in config/etc/systemd)
 )
 dnf install -y "${BASE_PKGS[@]}"
 
@@ -303,7 +304,7 @@ systemctl enable --now cups
 
 # === Personal Software ===
 dnf makecache
-dnf install -y google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine
+dnf install -y google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine fuzzel
 
 # === Zed editor (official installer, per-user) ===
 color_echo "blue" "-> Installing Zed editor for $ACTUAL_USER..."

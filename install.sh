@@ -17,7 +17,7 @@ color_echo() {
         "red")    echo -e "\033[0;31m$text\033[0m" ;;
         "green")  echo -e "\033[0;32m$text\033[0m" ;;
         "yellow") echo -e "\033[1;33m$text\033[0m" ;;
-        "blue")   echo -e "\033[0;34m$text\033[0m" ;;
+        "cyan")   echo -e "\033[0;36m$text\033[0m" ;;
         *)        echo "$text" ;;
     esac
 }
@@ -36,13 +36,13 @@ echo ""
 # ---------------------------------------------------------------------
 # 1. System upgrade
 # ---------------------------------------------------------------------
-color_echo "blue" "[1/5] Performing a system upgrade (this may take some time)..."
+color_echo "cyan" "[1/5] Performing a system upgrade..."
 dnf up -y
 
 # ---------------------------------------------------------------------
 # 2. Set Hostname
 # ---------------------------------------------------------------------
-color_echo "blue" "[2/5] Setting the system hostname (only letters, numbers, _, -; no spaces)..."
+color_echo "cyan" "[2/5] Setting the system hostname (only letters, numbers, _, -; no spaces)..."
 while true; do
     read -p "Please enter hostname: " new_hostname
     if [ -z "$new_hostname" ]; then
@@ -61,7 +61,7 @@ hostnamectl set-hostname "$new_hostname"
 # ---------------------------------------------------------------------
 # 3. Optimized DNF package manager
 # ---------------------------------------------------------------------
-color_echo "blue" "[3/5] Optimizing DNF configuration files..."
+color_echo "cyan" "[3/5] Optimizing DNF configuration files..."
 if [ -f /etc/dnf/dnf.conf ]; then
     # dnf5-plugins provides copr/config-manager for dnf5 (Fedora 41+)
     dnf install -y dnf5-plugins
@@ -74,7 +74,7 @@ fi
 # ---------------------------------------------------------------------
 # 4. Enable RPM Fusion & Terra repo / Multimedia decoder / Intel & AMD & Nvidia
 # ---------------------------------------------------------------------
-color_echo "blue" "[4/5] Enabling RPM Fusion and completing system multimedia decoders..."
+color_echo "cyan" "[4/5] Enabling RPM Fusion and completing system multimedia decoders..."
 # Enable Fedora's OpenH264 repo (H.264 codec for Firefox)
 # dnf config-manager setopt fedora-cisco-openh264.enabled=1
 dnf install -y https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
@@ -89,10 +89,10 @@ nvidia_gpu_info=$(lspci 2>/dev/null | grep -i nvidia || true)
 if [ -z "$nvidia_gpu_info" ]; then
     color_echo "yellow" "-> No NVIDIA GPU detected, skipping NVIDIA driver prompt"
 else
-    color_echo "blue" "NVIDIA GPU detected: $nvidia_gpu_info"
-    color_echo "blue" "Select NVIDIA driver branch:"
-    color_echo "blue" "[1] driver-580: Maxwell and Pascal"
-    color_echo "blue" "[2] latest    : Current GeForce/Quadro/Tesla"
+    color_echo "cyan" "NVIDIA GPU detected: $nvidia_gpu_info"
+    color_echo "cyan" "Select NVIDIA driver branch:"
+    color_echo "cyan" "[1] driver-580: Maxwell and Pascal"
+    color_echo "cyan" "[2] latest    : Current GeForce/Quadro/Tesla"
     NVIDIA_PKGS="nvidia-driver nvidia-settings nvidia-driver-cuda akmod-nvidia nvidia-driver-libs.i686"
     while true; do
         read -p "Select 1/2: " nvidia_choice
@@ -110,9 +110,9 @@ else
             *) color_echo "red" "Invalid choice, please enter 1 or 2." ;;
         esac
     done
-    color_echo "blue" "-> Installing NVIDIA driver and CUDA components..."
+    color_echo "cyan" "-> Installing NVIDIA driver and CUDA components..."
     dnf install -y $NVIDIA_PKGS
-    color_echo "blue" "-> Installing NVIDIA hardware acceleration..."
+    color_echo "cyan" "-> Installing NVIDIA hardware acceleration..."
     dnf install -y libva-nvidia-driver
     color_echo "green" "-> NVIDIA driver and libva-nvidia-driver installed"
 fi
@@ -122,8 +122,8 @@ amd_gpu_info=$(lspci 2>/dev/null | grep -i -E "amd|radeon" | grep -i -E "graphic
 if [ -z "$amd_gpu_info" ]; then
     color_echo "yellow" "-> No AMD GPU detected, skipping AMD mesa freeworld swap"
 else
-    color_echo "blue" "AMD GPU detected: $amd_gpu_info"
-    color_echo "blue" "-> Installing mesa freeworld drivers..."
+    color_echo "cyan" "AMD GPU detected: $amd_gpu_info"
+    color_echo "cyan" "-> Installing mesa freeworld drivers..."
     dnf install -y mesa-va-drivers-freeworld mesa-va-drivers-freeworld.i686
     dnf swap -y mesa-vulkan-drivers{,-freeworld}
     dnf swap -y mesa-vulkan-drivers{,-freeworld}.i686
@@ -135,10 +135,10 @@ intel_gpu_info=$(lspci 2>/dev/null | grep -i "intel" | grep -i -E "graphics|vga|
 if [ -z "$intel_gpu_info" ]; then
     color_echo "yellow" "-> No Intel GPU detected, skipping Intel VAAPI driver prompt"
 else
-    color_echo "blue" "Intel GPU detected: $intel_gpu_info"
-    color_echo "blue" "Select Intel VAAPI driver (hardware acceleration):"
-    color_echo "blue" "[1] Older : 1st-4th Gen, HD 2000/3000/4000"
-    color_echo "blue" "[2] Recent: 5th Gen+ / Core Ultra / Arc"
+    color_echo "cyan" "Intel GPU detected: $intel_gpu_info"
+    color_echo "cyan" "Select Intel VAAPI driver (hardware acceleration):"
+    color_echo "cyan" "[1] Older : 1st-4th Gen, HD 2000/3000/4000"
+    color_echo "cyan" "[2] Recent: 5th Gen+ / Core Ultra / Arc"
     while true; do
         read -p "Select 1/2: " intel_choice
         case "$intel_choice" in
@@ -156,7 +156,7 @@ dnf install @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-
 # ---------------------------------------------------------------------
 # 5. Installation of core applications and tools
 # ---------------------------------------------------------------------
-color_echo "blue" "[5/5] Installing dnf packages..."
+color_echo "cyan" "[5/5] Installing dnf packages..."
 
 # === Enable COPR ===
 COPR_REPOS=(
@@ -172,20 +172,13 @@ done
 
 # === Install config files (config/ mirrors /) ===
 if [ -d "$SCRIPT_DIR/config" ]; then
-    color_echo "blue" "-> Installing config files..."
+    color_echo "cyan" "-> Installing config files..."
     cp -r "$SCRIPT_DIR/config/." /
     color_echo "green" "-> Config files installed"
 fi
 
-# === Enable Mega-CLI ===
-FEDORA_VERSION=$(rpm -E %fedora)
-dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megacmd-Fedora_${FEDORA_VERSION}.x86_64.rpm"
-
-# === Install OnlyOffice DesktopEditors (official RPM) ===
-dnf install -y https://github.com/ONLYOFFICE/DesktopEditors/releases/latest/download/onlyoffice-desktopeditors.x86_64.rpm
-
 BASE_PKGS=(
-    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make starship ripgrep fd-find zoxide eza fzf bat tealdeer duf #  tools
+    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat tealdeer duf #  tools
     gnome-keyring gnome-keyring-pam # keyring
     adw-gtk3-theme qt5ct qt6ct # unified theme
     xdg-user-dirs power-profiles-daemon # xdg user dirs / power profiles
@@ -193,7 +186,6 @@ BASE_PKGS=(
     fuse fuse-libs # AppImage support
     pipewire wireplumber alsa-utils pulseaudio-utils  # Sound
     cups gutenprint gutenprint-cups sane-backends # Printer&Scanner for Canon e400 series
-    fcitx5 fcitx5-chinese-addons fcitx5-configtool fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram # fcitx5
     bibata-cursor-themes papirus-icon # from khoocw97's repo
     udiskie # auto-mount external drives (unit in service/user)
     zram-generator # zram swap (config in config/etc/systemd)
@@ -210,13 +202,14 @@ FONT_PKGS=(
 )
 dnf install -y --setopt=install_weak_deps=False "${FONT_PKGS[@]}"
 
-# --- Switch input method from ibus to fcitx5 ---
+# --- Switch input method from ibus to fcitx5 + rime ---
+dnf install -y fcitx5 fcitx5-chinese-addons fcitx5-configtool fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram
 dnf remove -y ibus ibus-anthy ibus-anthy-python ibus-chewing ibus-gtk3 ibus-gtk4 ibus-hangul \
     ibus-libpinyin ibus-libs ibus-m17n ibus-setup ibus-typing-booster python3-ibus 2>/dev/null || true
 
 # === Install services (service/system -> /etc/systemd/system, service/user -> /etc/systemd/user) ===
 if [ -d "$SCRIPT_DIR/service" ]; then
-    color_echo "blue" "-> Installing services..."
+    color_echo "cyan" "-> Installing services..."
     if [ -d "$SCRIPT_DIR/service/system" ]; then
         install -d /etc/systemd/system
         cp -r "$SCRIPT_DIR/service/system/." /etc/systemd/system/
@@ -257,7 +250,7 @@ systemctl set-default graphical.target
 color_echo "green" "-> sddm installed"
 
 # --- SDDM theme: simple-sddm ---
-color_echo "blue" "-> Installing simple-sddm theme..."
+color_echo "cyan" "-> Installing simple-sddm theme..."
 SDDM_THEME_DIR=/usr/share/sddm/themes/simple-sddm
 SDDM_TMP=$(mktemp -d)
 if git clone --depth=1 https://github.com/khoocw97/simple-sddm.git "$SDDM_TMP"; then
@@ -278,14 +271,14 @@ fi
 rm -rf "$SDDM_TMP"
 
 # --- Compositor: niri or umbriel ---
-color_echo "blue" "Select compositor:"
-color_echo "blue" "[1] niri    : + noctalia shell"
-color_echo "blue" "[2] umbriel : + noctalia shell"
+color_echo "cyan" "Select compositor:"
+color_echo "cyan" "[1] niri    : + noctalia shell"
+color_echo "cyan" "[2] umbriel : + noctalia shell"
 while true; do
     read -p "Select 1/2: " wm_choice
     case "$wm_choice" in
         1)
-            dnf install -y niri noctalia xwayland-satellite --exclude=alacritty,waybar,mako,swaylock
+            dnf install -y niri noctalia xwayland-satellite --exclude=alacritty,waybar,mako,swaylock,fuzzel
             # Portal config comes from config/
             color_echo "green" "-> niri + noctalia installed (GTK file chooser)"
             break ;;
@@ -306,21 +299,28 @@ systemctl enable --now cups
 dnf makecache
 dnf install -y google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine fuzzel
 
+# === Enable Mega-CLI ===
+FEDORA_VERSION=$(rpm -E %fedora)
+dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megacmd-Fedora_${FEDORA_VERSION}.x86_64.rpm"
+
+# === Install OnlyOffice DesktopEditors (official RPM) ===
+dnf install -y https://github.com/ONLYOFFICE/DesktopEditors/releases/latest/download/onlyoffice-desktopeditors.x86_64.rpm
+
 # === Zed editor (official installer, per-user) ===
-color_echo "blue" "-> Installing Zed editor for $ACTUAL_USER..."
+color_echo "cyan" "-> Installing Zed editor for $ACTUAL_USER..."
 su - "$ACTUAL_USER" -c "curl -f https://zed.dev/install.sh | sh"
 color_echo "green" "-> Zed installed"
 
 # === opencode (official installer, per-user) ===
-color_echo "blue" "-> Installing opencode for $ACTUAL_USER..."
+color_echo "cyan" "-> Installing opencode for $ACTUAL_USER..."
 su - "$ACTUAL_USER" -c "curl -fsSL https://opencode.ai/v2/install | bash"
 color_echo "green" "-> opencode installed"
 
 # === DVD Playback Support (optional) ===
-color_echo "blue" "DVD playback requires RPM Fusion tainted repository and libdvdcss (may be restricted in some countries per RPM Fusion: Tainted free is for FLOSS packages where usage might be restricted in some countries)."
+color_echo "cyan" "DVD playback requires RPM Fusion tainted repository and libdvdcss (may be restricted in some countries per RPM Fusion: Tainted free is for FLOSS packages where usage might be restricted in some countries)."
 read -p "Install DVD playback support (libdvdcss)? [y/N]: " install_dvd
 if [[ "$install_dvd" =~ ^[Yy]$ ]]; then
-    color_echo "blue" "-> Enabling rpmfusion-free-tainted and installing libdvdcss..."
+    color_echo "cyan" "-> Enabling rpmfusion-free-tainted and installing libdvdcss..."
     dnf install -y rpmfusion-free-release-tainted
     dnf install -y libdvdcss
     color_echo "green" "-> DVD support installed (libdvdcss)"
@@ -332,7 +332,7 @@ fi
 # Application configuration area for non-ROOT user environments (Flatpak/Flathub)
 # =====================================================================
 echo ""
-color_echo "blue" "Starting to hand over the configuration of Flatpak without permissions to the normal user environment..."
+color_echo "cyan" "Starting to hand over the configuration of Flatpak without permissions to the normal user environment..."
 
 # Initialize and add Flathub as a normal user.
 su - "$ACTUAL_USER" -c "flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo"
@@ -372,5 +372,5 @@ if [[ $reboot_choice =~ ^[Yy]$ ]]; then
     color_echo "green" "Rebooting..."
     reboot
 else
-    color_echo "blue" "The restart has been postponed. Please remember to manually restart the system later."
+    color_echo "cyan" "The restart has been postponed. Please remember to manually restart the system later."
 fi

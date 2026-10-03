@@ -71,15 +71,31 @@ else
     color_echo "red" "-> Error: /etc/dnf/dnf.conf configuration file not found!"
 fi
 
+# --- Pin repos to a single fast mirror (metalink often picks slow mirrors) ---
+FEDORA_MIRROR="https://mirror.twds.com.tw/fedora/fedora/linux"
+RPMFUSION_MIRROR="https://mirror.twds.com.tw/rpmfusion"
+sed -e 's|^metalink=|#metalink=|g' \
+    -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=${FEDORA_MIRROR}|g" \
+    -i.bak /etc/yum.repos.d/fedora.repo /etc/yum.repos.d/fedora-updates.repo
+color_echo "green" "-> Fedora repos pinned to $FEDORA_MIRROR (metalink disabled)"
+
 # ---------------------------------------------------------------------
 # 4. Enable RPM Fusion & Terra repo / Multimedia decoder / Intel & AMD & Nvidia
 # ---------------------------------------------------------------------
 color_echo "cyan" "[4/5] Enabling RPM Fusion and completing system multimedia decoders..."
 # Enable Fedora's OpenH264 repo (H.264 codec for Firefox)
 # dnf config-manager setopt fedora-cisco-openh264.enabled=1
-dnf install -y https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
-dnf install -y https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+dnf install -y "${RPMFUSION_MIRROR}/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+dnf install -y "${RPMFUSION_MIRROR}/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
 dnf install -y 'rpmfusion-*-appstream-data'
+# Pin rpmfusion repos to the mirror (disable metalink/mirrorlist, enable baseurl)
+sed -e 's!^metalink=!#metalink=!g' \
+    -e 's!^mirrorlist=!#mirrorlist=!g' \
+    -e 's!^#baseurl=!baseurl=!g' \
+    -e "s!http://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
+    -e "s!https://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
+    -i.bak /etc/yum.repos.d/rpmfusion*.repo
+color_echo "green" "-> RPM Fusion repos pinned to $RPMFUSION_MIRROR"
 
 # --- lspci install ---
 command -v lspci >/dev/null 2>&1 || dnf install -y pciutils
@@ -230,19 +246,6 @@ if [ -d "$SCRIPT_DIR/service" ]; then
     color_echo "green" "-> Services installed"
 fi
 
-# === Run scripts (script/) ===
-if [ -d "$SCRIPT_DIR/script" ]; then
-    for s in "$SCRIPT_DIR"/script/*; do
-        [ -f "$s" ] || continue
-        read -p "Run $(basename "$s")? [y/N]: " run_script
-        if [[ "$run_script" =~ ^[Yy]$ ]]; then
-            su - "$ACTUAL_USER" -c "bash \"$s\""
-        else
-            color_echo "yellow" "-> Skipped $(basename "$s")"
-        fi
-    done
-fi
-
 # --- Display manager: sddm ---
 dnf install -y sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes
 systemctl enable sddm
@@ -280,10 +283,12 @@ while true; do
         1)
             dnf install -y niri noctalia xwayland-satellite --exclude=alacritty,waybar,mako,swaylock,fuzzel
             # Portal config comes from config/
-            color_echo "green" "-> niri + noctalia installed (GTK file chooser)"
+            color_echo "green" "-> niri + noctalia installed (GTK file chooser: Nemo)"
             break ;;
         2)
             dnf install -y umbriel noctalia xwayland-satellite xdg-desktop-portal-umbriel
+            # remove niri portal config (bulk-copied from config/ earlier)
+            rm -f /usr/share/xdg-desktop-portal/niri-portals.conf
             color_echo "green" "-> umbriel installed"
             break ;;
         *) color_echo "red" "Invalid choice, please enter 1 or 2." ;;
@@ -297,7 +302,7 @@ systemctl enable --now cups
 
 # === Personal Software ===
 dnf makecache
-dnf install -y google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine fuzzel
+dnf install -y google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine fuzzel swayimg
 
 # === Enable Mega-CLI ===
 FEDORA_VERSION=$(rpm -E %fedora)
@@ -345,7 +350,6 @@ FLATPAK_APPS=(
     "it.mijorus.gearlever"
     "com.github.jeromerobert.pdfarranger"
     "org.localsend.localsend_app"
-    "org.gnome.Loupe"
     "io.github.diegopvlk.Cine"
     "com.github.flxzt.rnote"
     "com.obsproject.Studio.Plugin.Gstreamer"
@@ -360,6 +364,19 @@ FLATPAK_APPS=(
 su - "$ACTUAL_USER" -c "flatpak install --user -y flathub ${FLATPAK_APPS[*]}"
 # Automatically fix potential flatpak permission tree issues
 su - "$ACTUAL_USER" -c "flatpak repair --user" 2>/dev/null
+
+# === Run scripts (script/) ===
+if [ -d "$SCRIPT_DIR/script" ]; then
+    for s in "$SCRIPT_DIR"/script/*; do
+        [ -f "$s" ] || continue
+        read -p "Run $(basename "$s")? [y/N]: " run_script
+        if [[ "$run_script" =~ ^[Yy]$ ]]; then
+            su - "$ACTUAL_USER" -c "bash \"$s\""
+        else
+            color_echo "yellow" "-> Skipped $(basename "$s")"
+        fi
+    done
+fi
 
 echo ""
 color_echo "green" "======================================================="

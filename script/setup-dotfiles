@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Clone dotfiles
+DEST="$HOME/Project/dotfiles"
+if [ -d "$DEST/.git" ]; then
+    echo "-> $DEST already cloned, skipping"
+    exit 0
+fi
+install -d "$(dirname "$DEST")"
+git clone https://github.com/khoocw97/dotfiles.git "$DEST"

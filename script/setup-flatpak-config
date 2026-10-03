@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Grant xournalpp access to host config dir
+flatpak override --user --filesystem=xdg-config/xournalpp com.github.xournalpp.xournalpp
+# Set wechat use wayland & fix chinese input
+flatpak override --user --socket=wayland com.tencent.WeChat
+flatpak override --user --env=QT_IM_MODULE=fcitx --env=GTK_IM_MODULE=fcitx com.tencent.WeChat

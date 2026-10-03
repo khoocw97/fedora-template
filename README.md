@@ -47,4 +47,4 @@ sudo ./install.sh
    - AI: [opencode](https://opencode.ai) (official installer, per-user)
    - Optional DVD support (`libdvdcss`, tainted repo)
    - Flatpak (per-user Flathub): 
-   > - `Firefox, OBS (+Gstreamer/VAAPI plugins), Flatseal, Gearlever, pdfarranger, LocalSend, Loupe, Cine, Rnote, Bazaar, Warehouse, MissionCenter, ProtonVPN`
+   > - `Firefox, OBS (+Gstreamer/VAAPI plugins), Flatseal, Gearlever, pdfarranger, LocalSend, Cine, Rnote, Bazaar, Warehouse, MissionCenter, ProtonVPN`

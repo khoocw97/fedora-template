@@ -71,31 +71,53 @@ else
     color_echo "red" "-> Error: /etc/dnf/dnf.conf configuration file not found!"
 fi
 
-# --- Pin repos to a single fast mirror (metalink often picks slow mirrors) ---
-FEDORA_MIRROR="https://mirror.twds.com.tw/fedora/fedora/linux"
-RPMFUSION_MIRROR="https://mirror.twds.com.tw/rpmfusion"
-sed -e 's|^metalink=|#metalink=|g' \
-    -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=${FEDORA_MIRROR}|g" \
-    -i.bak /etc/yum.repos.d/fedora.repo /etc/yum.repos.d/fedora-updates.repo
-color_echo "green" "-> Fedora repos pinned to $FEDORA_MIRROR (metalink disabled)"
-
 # ---------------------------------------------------------------------
 # 4. Enable RPM Fusion & Terra repo / Multimedia decoder / Intel & AMD & Nvidia
 # ---------------------------------------------------------------------
 color_echo "cyan" "[4/5] Enabling RPM Fusion and completing system multimedia decoders..."
+# Repo mirror bases. Fedora repos are pinned to FEDORA_MIRROR further below,
+# only AFTER RPM Fusion is installed (pinning them earlier breaks repo resolution).
+FEDORA_MIRROR="https://mirror.twds.com.tw/fedora/fedora/linux"
+RPMFUSION_MIRROR="https://mirror.twds.com.tw/rpmfusion"
 # Enable Fedora's OpenH264 repo (H.264 codec for Firefox)
 # dnf config-manager setopt fedora-cisco-openh264.enabled=1
 dnf install -y "${RPMFUSION_MIRROR}/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
 dnf install -y "${RPMFUSION_MIRROR}/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
 dnf install -y 'rpmfusion-*-appstream-data'
 # Pin rpmfusion repos to the mirror (disable metalink/mirrorlist, enable baseurl)
-sed -e 's!^metalink=!#metalink=!g' \
-    -e 's!^mirrorlist=!#mirrorlist=!g' \
-    -e 's!^#baseurl=!baseurl=!g' \
-    -e "s!http://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
-    -e "s!https://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
-    -i.bak /etc/yum.repos.d/rpmfusion*.repo
-color_echo "green" "-> RPM Fusion repos pinned to $RPMFUSION_MIRROR"
+# NOTE: on dnf5-based Fedora the vendor repo files live in /usr/share/dnf5/repos.d,
+# while /etc/yum.repos.d only holds admin-added repos. Check both locations.
+shopt -s nullglob
+RPMFUSION_REPOS=(/etc/yum.repos.d/rpmfusion*.repo /usr/share/dnf5/repos.d/rpmfusion*.repo)
+if ((${#RPMFUSION_REPOS[@]} == 0)); then
+    color_echo "yellow" "-> Warning: no rpmfusion repo files found, skipping pin"
+else
+    sed -e 's!^metalink=!#metalink=!g' \
+        -e 's!^mirrorlist=!#mirrorlist=!g' \
+        -e 's!^#baseurl=!baseurl=!g' \
+        -e "s!http://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
+        -e "s!https://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
+        -i.bak "${RPMFUSION_REPOS[@]}"
+    color_echo "green" "-> RPM Fusion repos pinned to $RPMFUSION_MIRROR"
+fi
+# Pin Fedora repos to the mirror (metalink often picks slow mirrors)
+# NOTE: same dual-location lookup as above. On Rawhide the active repo is
+# fedora-rawhide.repo (fedora.repo/updates are disabled there), so include it.
+FEDORA_REPOS=()
+for repo_dir in /etc/yum.repos.d /usr/share/dnf5/repos.d; do
+    for repo_file in fedora.repo fedora-updates.repo fedora-rawhide.repo; do
+        [ -f "$repo_dir/$repo_file" ] && FEDORA_REPOS+=("$repo_dir/$repo_file")
+    done
+done
+if ((${#FEDORA_REPOS[@]} == 0)); then
+    color_echo "yellow" "-> Warning: no Fedora repo files found, skipping pin"
+else
+    sed -e 's|^metalink=|#metalink=|g' \
+        -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=${FEDORA_MIRROR}|g" \
+        -i.bak "${FEDORA_REPOS[@]}"
+    color_echo "green" "-> Fedora repos pinned to $FEDORA_MIRROR (metalink disabled)"
+fi
+shopt -u nullglob
 
 # --- lspci install ---
 command -v lspci >/dev/null 2>&1 || dnf install -y pciutils

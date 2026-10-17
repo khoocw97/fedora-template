@@ -65,18 +65,17 @@ color_echo "cyan" "[3/5] Optimizing DNF configuration files..."
 if [ -f /etc/dnf/dnf.conf ]; then
     # dnf5-plugins provides copr/config-manager for dnf5 (Fedora 41+)
     dnf install -y dnf5-plugins
-    dnf config-manager setopt max_parallel_downloads=20 minrate=1M timeout=20
+    dnf config-manager setopt max_parallel_downloads=20 minrate=1M timeout=30
     color_echo "green" "-> Complete (parallel download=20)"
 else
     color_echo "red" "-> Error: /etc/dnf/dnf.conf configuration file not found!"
 fi
 
 # ---------------------------------------------------------------------
-# 4. Enable RPM Fusion & Terra repo / Multimedia decoder / Intel & AMD & Nvidia
+# 4. Enable RPM Fusion / Multimedia decoder / Intel & AMD & Nvidia
 # ---------------------------------------------------------------------
 color_echo "cyan" "[4/5] Enabling RPM Fusion and completing system multimedia decoders..."
-# Repo mirror bases. Fedora repos are pinned to FEDORA_MIRROR further below,
-# only AFTER RPM Fusion is installed (pinning them earlier breaks repo resolution).
+# Repo mirror 
 FEDORA_MIRROR="https://mirror.twds.com.tw/fedora/fedora/linux"
 RPMFUSION_MIRROR="https://mirror.twds.com.tw/rpmfusion"
 # Enable Fedora's OpenH264 repo (H.264 codec for Firefox)
@@ -84,9 +83,8 @@ RPMFUSION_MIRROR="https://mirror.twds.com.tw/rpmfusion"
 dnf install -y "${RPMFUSION_MIRROR}/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
 dnf install -y "${RPMFUSION_MIRROR}/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
 dnf install -y 'rpmfusion-*-appstream-data'
-# Pin rpmfusion repos to the mirror (disable metalink/mirrorlist, enable baseurl)
+# Pin rpmfusion repos to the mirror (Disable metalink/mirrorlist, enable baseurl)
 # NOTE: on dnf5-based Fedora the vendor repo files live in /usr/share/dnf5/repos.d,
-# while /etc/yum.repos.d only holds admin-added repos. Check both locations.
 shopt -s nullglob
 RPMFUSION_REPOS=(/etc/yum.repos.d/rpmfusion*.repo /usr/share/dnf5/repos.d/rpmfusion*.repo)
 if ((${#RPMFUSION_REPOS[@]} == 0)); then
@@ -100,12 +98,10 @@ else
         -i.bak "${RPMFUSION_REPOS[@]}"
     color_echo "green" "-> RPM Fusion repos pinned to $RPMFUSION_MIRROR"
 fi
-# Pin Fedora repos to the mirror (metalink often picks slow mirrors)
-# NOTE: same dual-location lookup as above. On Rawhide the active repo is
-# fedora-rawhide.repo (fedora.repo/updates are disabled there), so include it.
+
 FEDORA_REPOS=()
 for repo_dir in /etc/yum.repos.d /usr/share/dnf5/repos.d; do
-    for repo_file in fedora.repo fedora-updates.repo fedora-rawhide.repo; do
+    for repo_file in fedora.repo fedora-updates.repo; do
         [ -f "$repo_dir/$repo_file" ] && FEDORA_REPOS+=("$repo_dir/$repo_file")
     done
 done
@@ -200,7 +196,7 @@ color_echo "cyan" "[5/5] Installing dnf packages..."
 COPR_REPOS=(
     "lihaohong/yazi"
     "imput/helium"
-    "khoocw97/software"
+    "khoocw97/software"  # personal software
     "lizardbyte/stable"  # sunshine
     "atim/starship"      # starship prompt
 )
@@ -216,13 +212,13 @@ if [ -d "$SCRIPT_DIR/config" ]; then
 fi
 
 BASE_PKGS=(
-    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat tealdeer duf #  tools
+    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat tealdeer duf # tools
     gnome-keyring gnome-keyring-pam # keyring
     adw-gtk3-theme qt5ct qt6ct # unified theme
     xdg-user-dirs power-profiles-daemon # xdg user dirs / power profiles
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
     fuse fuse-libs # AppImage support
-    pipewire wireplumber alsa-utils pulseaudio-utils  # Sound
+    pipewire wireplumber alsa-utils pulseaudio-utils # Sound
     cups gutenprint gutenprint-cups sane-backends # Printer&Scanner for Canon e400 series
     bibata-cursor-themes papirus-icon # from khoocw97's repo
     udiskie # auto-mount external drives (unit in service/user)

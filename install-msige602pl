@@ -1,0 +1,340 @@
+#!/bin/bash
+# =====================================================================
+# Fedora System Optimization, Hardware Setup & Application Installer
+# =====================================================================
+
+# Ensure the script runs with root/sudo privileges
+if [ "$EUID" -ne 0 ]; then
+    echo -e "\033[0;31m Error: Please run this script with sudo!\033[0m"
+    exit 1
+fi
+
+# Color output function
+color_echo() {
+    local color="$1"
+    local text="$2"
+    case "$color" in
+        "red")    echo -e "\033[0;31m$text\033[0m" ;;
+        "green")  echo -e "\033[0;32m$text\033[0m" ;;
+        "yellow") echo -e "\033[1;33m$text\033[0m" ;;
+        "cyan")   echo -e "\033[0;36m$text\033[0m" ;;
+        *)        echo "$text" ;;
+    esac
+}
+
+# Basic variable definition
+ACTUAL_USER=${SUDO_USER:-$(logname 2>/dev/null)}
+# Directory of this script, so the config/ service/ script/ folders work from any CWD
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "╔═══════════════════════════════════════════════════════════════╗"
+echo "║             FEDORA SYSTEM INTEGRATED SETUP SCRIPT             ║"
+echo "╚═══════════════════════════════════════════════════════════════╝"
+echo "Preparing to configure the system for regular user: $ACTUAL_USER..."
+echo ""
+
+# ---------------------------------------------------------------------
+# 1. System upgrade
+# ---------------------------------------------------------------------
+color_echo "cyan" "[1/5] Performing a system upgrade..."
+dnf up -y
+
+# ---------------------------------------------------------------------
+# 2. Set Hostname
+# ---------------------------------------------------------------------
+color_echo "cyan" "[2/5] Setting the system hostname..."
+color_echo "green" "Changing the hostname to: msi-pc ..."
+hostnamectl set-hostname msi-pc
+
+# ---------------------------------------------------------------------
+# 3. Optimized DNF package manager
+# ---------------------------------------------------------------------
+color_echo "cyan" "[3/5] Optimizing DNF configuration files..."
+if [ -f /etc/dnf/dnf.conf ]; then
+    # dnf5-plugins provides copr/config-manager for dnf5 (Fedora 41+)
+    dnf install -y dnf5-plugins
+    dnf config-manager setopt max_parallel_downloads=20
+    color_echo "green" "-> Complete (parallel download=20)"
+else
+    color_echo "red" "-> Error: /etc/dnf/dnf.conf configuration file not found!"
+fi
+
+# ---------------------------------------------------------------------
+# 4. Enable RPM Fusion / Multimedia decoder / Intel & AMD & Nvidia
+# ---------------------------------------------------------------------
+color_echo "cyan" "[4/5] Enabling RPM Fusion and completing system multimedia decoders..."
+# Repo mirror
+FEDORA_MIRROR="https://mirror.twds.com.tw/fedora/fedora/linux"
+RPMFUSION_MIRROR="https://mirror.twds.com.tw/rpmfusion"
+# Enable Fedora's OpenH264 repo (H.264 codec for Firefox)
+# dnf config-manager setopt fedora-cisco-openh264.enabled=1
+dnf install -y "${RPMFUSION_MIRROR}/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+dnf install -y "${RPMFUSION_MIRROR}/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
+dnf install -y 'rpmfusion-*-appstream-data'
+# Pin rpmfusion repos to the mirror (Disable metalink/mirrorlist, enable baseurl)
+# NOTE: on dnf5-based Fedora the vendor repo files live in /usr/share/dnf5/repos.d,
+shopt -s nullglob
+RPMFUSION_REPOS=(/etc/yum.repos.d/rpmfusion*.repo /usr/share/dnf5/repos.d/rpmfusion*.repo)
+if ((${#RPMFUSION_REPOS[@]} == 0)); then
+    color_echo "yellow" "-> Warning: no rpmfusion repo files found, skipping pin"
+else
+    sed -e 's!^metalink=!#metalink=!g' \
+        -e 's!^mirrorlist=!#mirrorlist=!g' \
+        -e 's!^#baseurl=!baseurl=!g' \
+        -e "s!http://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
+        -e "s!https://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
+        -i.bak "${RPMFUSION_REPOS[@]}"
+    color_echo "green" "-> RPM Fusion repos pinned to $RPMFUSION_MIRROR"
+fi
+
+FEDORA_REPOS=()
+for repo_dir in /etc/yum.repos.d /usr/share/dnf5/repos.d; do
+    for repo_file in fedora.repo fedora-updates.repo; do
+        [ -f "$repo_dir/$repo_file" ] && FEDORA_REPOS+=("$repo_dir/$repo_file")
+    done
+done
+if ((${#FEDORA_REPOS[@]} == 0)); then
+    color_echo "yellow" "-> Warning: no Fedora repo files found, skipping pin"
+else
+    sed -e 's|^metalink=|#metalink=|g' \
+        -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=${FEDORA_MIRROR}|g" \
+        -i.bak "${FEDORA_REPOS[@]}"
+    color_echo "green" "-> Fedora repos pinned to $FEDORA_MIRROR (metalink disabled)"
+fi
+shopt -u nullglob
+
+# --- lspci install ---
+command -v lspci >/dev/null 2>&1 || dnf install -y pciutils
+
+# --- NVIDIA driver (hardware-aware, lspci) ---
+nvidia_gpu_info=$(lspci 2>/dev/null | grep -i nvidia || true)
+if [ -z "$nvidia_gpu_info" ]; then
+    color_echo "yellow" "-> No NVIDIA GPU detected, skipping NVIDIA driver prompt"
+else
+    color_echo "cyan" "NVIDIA GPU detected: $nvidia_gpu_info"
+    color_echo "cyan" "-> Using driver-580 branch (Maxwell/Pascal)"
+    NVIDIA_PKGS="nvidia-driver nvidia-settings nvidia-driver-cuda akmod-nvidia nvidia-driver-libs.i686"
+    dnf config-manager addrepo --from-repofile=https://negativo17.org/repos/fedora-nvidia-580.repo
+    dnf config-manager setopt fedora-nvidia-580.priority=90
+    color_echo "cyan" "-> Installing NVIDIA driver and CUDA components..."
+    dnf install -y $NVIDIA_PKGS
+    color_echo "cyan" "-> Installing NVIDIA hardware acceleration..."
+    dnf install -y libva-nvidia-driver
+    color_echo "green" "-> NVIDIA driver and libva-nvidia-driver installed"
+fi
+
+# --- AMD mesa freeworld (hardware-aware, lspci) ---
+amd_gpu_info=$(lspci 2>/dev/null | grep -i -E "amd|radeon" | grep -i -E "graphics|vga|display" || true)
+if [ -z "$amd_gpu_info" ]; then
+    color_echo "yellow" "-> No AMD GPU detected, skipping AMD mesa freeworld swap"
+else
+    color_echo "cyan" "AMD GPU detected: $amd_gpu_info"
+    color_echo "cyan" "-> Installing mesa freeworld drivers..."
+    dnf install -y mesa-va-drivers-freeworld mesa-va-drivers-freeworld.i686
+    dnf swap -y mesa-vulkan-drivers{,-freeworld}
+    dnf swap -y mesa-vulkan-drivers{,-freeworld}.i686
+    color_echo "green" "-> mesa freeworld installed"
+fi
+
+# --- Intel VAAPI driver ---
+intel_gpu_info=$(lspci 2>/dev/null | grep -i "intel" | grep -i -E "graphics|vga|display|arc" || true)
+if [ -z "$intel_gpu_info" ]; then
+    color_echo "yellow" "-> No Intel GPU detected, skipping Intel VAAPI driver prompt"
+else
+    color_echo "cyan" "Intel GPU detected: $intel_gpu_info"
+    color_echo "cyan" "-> Installing libva-intel-driver (older 1st-4th Gen)..."
+    dnf install -y libva-intel-driver libva-intel-driver.i686
+    color_echo "green" "-> libva-intel-driver installed"
+fi
+
+# Replace ffmpeg-free package with the full FFmpeg package.
+dnf swap ffmpeg-free ffmpeg --allowerasing -y
+dnf install @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin -y
+
+# ---------------------------------------------------------------------
+# 5. Installation of core applications and tools
+# ---------------------------------------------------------------------
+color_echo "cyan" "[5/5] Installing dnf packages..."
+
+# === Enable COPR ===
+COPR_REPOS=(
+    "lihaohong/yazi"
+    "imput/helium"
+    "khoocw97/software"  # personal software
+    "lizardbyte/stable"  # sunshine
+    "atim/starship"      # starship prompt
+)
+for repo in "${COPR_REPOS[@]}"; do
+    dnf copr enable "$repo" -y
+done
+
+# === Install config files (config/ mirrors /) ===
+if [ -d "$SCRIPT_DIR/config" ]; then
+    color_echo "cyan" "-> Installing config files..."
+    cp -r "$SCRIPT_DIR/config/." /
+    color_echo "green" "-> Config files installed"
+fi
+
+BASE_PKGS=(
+    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat tealdeer duf # tools
+    gnome-keyring gnome-keyring-pam # keyring
+    adw-gtk3-theme qt5ct qt6ct # unified theme
+    xdg-user-dirs power-profiles-daemon # xdg user dirs / power profiles
+    flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
+    fuse fuse-libs # AppImage support
+    pipewire wireplumber alsa-utils pulseaudio-utils # Sound
+    cups gutenprint gutenprint-cups sane-backends # Printer&Scanner for Canon e400 series
+    bibata-cursor-themes papirus-icon # from khoocw97's repo
+    udiskie # auto-mount external drives (unit in service/user)
+    zram-generator # zram swap (config in config/etc/systemd)
+)
+dnf install -y "${BASE_PKGS[@]}"
+
+# --- Fonts & locale (no weak deps) ---
+FONT_PKGS=(
+    default-fonts default-fonts-core-emoji default-fonts-cjk-sans
+    google-noto-color-emoji-fonts google-noto-emoji-fonts google-noto-sans-cjk-vf-fonts
+    fira-code-fonts glibc-all-langpacks
+    langpacks-zh_CN langpacks-zh_TW langpacks-core-zh_CN langpacks-core-zh_TW langpacks-fonts-zh_CN langpacks-fonts-zh_TW
+    maple-mono-fonts lxgw-fonts # from khoocw97's repo
+)
+dnf install -y --setopt=install_weak_deps=False "${FONT_PKGS[@]}"
+
+# --- Switch input method from ibus to fcitx5 + rime ---
+dnf install -y fcitx5 fcitx5-chinese-addons fcitx5-configtool fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram
+dnf remove -y ibus ibus-anthy ibus-anthy-python ibus-chewing ibus-gtk3 ibus-gtk4 ibus-hangul \
+    ibus-libpinyin ibus-libs ibus-m17n ibus-setup ibus-typing-booster python3-ibus 2>/dev/null || true
+
+# === Install services (service/system -> /etc/systemd/system, service/user -> /etc/systemd/user) ===
+if [ -d "$SCRIPT_DIR/service" ]; then
+    color_echo "cyan" "-> Installing services..."
+    if [ -d "$SCRIPT_DIR/service/system" ]; then
+        install -d /etc/systemd/system
+        cp -r "$SCRIPT_DIR/service/system/." /etc/systemd/system/
+        for unit in "$SCRIPT_DIR"/service/system/*.service; do
+            [ -f "$unit" ] || continue
+            systemctl enable "$(basename "$unit")"
+        done
+    fi
+    if [ -d "$SCRIPT_DIR/service/user" ]; then
+        install -d /etc/systemd/user
+        cp -r "$SCRIPT_DIR/service/user/." /etc/systemd/user/
+        for unit in "$SCRIPT_DIR"/service/user/*.service; do
+            [ -f "$unit" ] || continue
+            systemctl --global enable "$(basename "$unit")"
+        done
+    fi
+    systemctl daemon-reload
+    color_echo "green" "-> Services installed"
+fi
+
+# === Run scripts (script/) ===
+if [ -d "$SCRIPT_DIR/script" ]; then
+    for s in "$SCRIPT_DIR"/script/*; do
+        [ -f "$s" ] || continue
+        color_echo "cyan" "-> Running $(basename "$s")..."
+        su - "$ACTUAL_USER" -c "bash \"$s\"" || color_echo "yellow" "-> $(basename "$s") failed, continuing"
+    done
+fi
+
+# --- Display manager: sddm ---
+dnf install -y sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes
+systemctl enable sddm
+systemctl set-default graphical.target
+color_echo "green" "-> sddm installed"
+
+# --- SDDM theme: simple-sddm ---
+color_echo "cyan" "-> Installing simple-sddm theme..."
+SDDM_THEME_DIR=/usr/share/sddm/themes/simple-sddm
+SDDM_TMP=$(mktemp -d)
+if git clone --depth=1 https://github.com/khoocw97/simple-sddm.git "$SDDM_TMP"; then
+    install -d "$SDDM_THEME_DIR"
+    install -m 644 "$SDDM_TMP/metadata.desktop" "$SDDM_TMP/Main.qml" "$SDDM_THEME_DIR"/
+    install -m 644 "$SDDM_TMP/preview/preview1.png" "$SDDM_THEME_DIR"/preview.png
+
+    # Theme config comes from config/; symlink it into the theme dir
+    ln -sf /etc/sddm/themes/simple-sddm/theme.conf "$SDDM_THEME_DIR/theme.conf"
+
+    # Comment any stale Current= in /etc/sddm.conf, it overrides sddm.conf.d
+    [ -f /etc/sddm.conf ] && sed -i 's/^[[:space:]]*Current[[:space:]]*=/#&/' /etc/sddm.conf
+
+    color_echo "green" "-> simple-sddm theme installed"
+else
+    color_echo "red" "-> Failed to clone simple-sddm, theme not installed"
+fi
+rm -rf "$SDDM_TMP"
+
+# --- Compositor: umbriel + noctalia ---
+dnf install -y umbriel noctalia xwayland-satellite xdg-desktop-portal-umbriel
+# remove niri portal config (bulk-copied from config/ earlier)
+rm -f /usr/share/xdg-desktop-portal/niri-portals.conf
+color_echo "green" "-> umbriel installed"
+
+# Add user to lp group
+usermod -aG lp "$ACTUAL_USER"
+# Enable Printer service
+systemctl enable --now cups
+
+# === Personal Software ===
+dnf makecache
+dnf install -y google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine fuzzel swayimg
+
+# === Enable Mega-CLI ===
+FEDORA_VERSION=$(rpm -E %fedora)
+dnf install -y "https://mega.nz/linux/repo/Fedora_${FEDORA_VERSION}/x86_64/megacmd-Fedora_${FEDORA_VERSION}.x86_64.rpm"
+
+# === Install OnlyOffice DesktopEditors (official RPM) ===
+dnf install -y https://github.com/ONLYOFFICE/DesktopEditors/releases/latest/download/onlyoffice-desktopeditors.x86_64.rpm
+
+# === Zed editor (official installer, per-user) ===
+color_echo "cyan" "-> Installing Zed editor for $ACTUAL_USER..."
+su - "$ACTUAL_USER" -c "curl -f https://zed.dev/install.sh | sh"
+color_echo "green" "-> Zed installed"
+
+# === opencode (official installer, per-user) ===
+color_echo "cyan" "-> Installing opencode for $ACTUAL_USER..."
+su - "$ACTUAL_USER" -c "curl -fsSL https://opencode.ai/v2/install | bash"
+color_echo "green" "-> opencode installed"
+
+# === DVD Playback Support (skipped: auto mode, no libdvdcss) ===
+
+# =====================================================================
+# Application configuration area for non-ROOT user environments (Flatpak/Flathub)
+# =====================================================================
+echo ""
+color_echo "cyan" "Starting to hand over the configuration of Flatpak without permissions to the normal user environment..."
+
+# Initialize and add Flathub as a normal user.
+su - "$ACTUAL_USER" -c "flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo"
+
+# Define the list of Flatpak software to be installed.
+FLATPAK_APPS=(
+    "org.mozilla.firefox"
+    "com.obsproject.Studio"
+    "com.github.tchx84.Flatseal"
+    "it.mijorus.gearlever"
+    "com.github.jeromerobert.pdfarranger"
+    "org.localsend.localsend_app"
+    "io.github.diegopvlk.Cine"
+    "com.github.flxzt.rnote"
+    "com.obsproject.Studio.Plugin.Gstreamer"
+    "com.obsproject.Studio.Plugin.GStreamerVaapi"
+    "io.github.kolunmi.Bazaar"
+    "io.github.flattool.Warehouse"
+    "io.missioncenter.MissionCenter"
+    "org.desktop_plus.desktop-plus"
+    "com.protonvpn.www"
+)
+# Install
+su - "$ACTUAL_USER" -c "flatpak install --user -y flathub ${FLATPAK_APPS[*]}"
+# Automatically fix potential flatpak permission tree issues
+su - "$ACTUAL_USER" -c "flatpak repair --user" 2>/dev/null
+
+echo ""
+color_echo "green" "======================================================="
+color_echo "green" "Setup complete."
+color_echo "green" "======================================================="
+
+# --- Reboot ---
+color_echo "green" "Rebooting..."
+reboot

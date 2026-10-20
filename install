@@ -264,6 +264,19 @@ if [ -d "$SCRIPT_DIR/service" ]; then
     color_echo "green" "-> Services installed"
 fi
 
+# === Run scripts (script/) ===
+if [ -d "$SCRIPT_DIR/script" ]; then
+    for s in "$SCRIPT_DIR"/script/*; do
+        [ -f "$s" ] || continue
+        read -p "Run $(basename "$s")? [y/N]: " run_script
+        if [[ "$run_script" =~ ^[Yy]$ ]]; then
+            su - "$ACTUAL_USER" -c "bash \"$s\""
+        else
+            color_echo "yellow" "-> Skipped $(basename "$s")"
+        fi
+    done
+fi
+
 # --- Display manager: sddm ---
 dnf install -y sddm qt6-qtdeclarative qt6-qtquickcontrols2 sddm-themes
 systemctl enable sddm
@@ -382,19 +395,6 @@ FLATPAK_APPS=(
 su - "$ACTUAL_USER" -c "flatpak install --user -y flathub ${FLATPAK_APPS[*]}"
 # Automatically fix potential flatpak permission tree issues
 su - "$ACTUAL_USER" -c "flatpak repair --user" 2>/dev/null
-
-# === Run scripts (script/) ===
-if [ -d "$SCRIPT_DIR/script" ]; then
-    for s in "$SCRIPT_DIR"/script/*; do
-        [ -f "$s" ] || continue
-        read -p "Run $(basename "$s")? [y/N]: " run_script
-        if [[ "$run_script" =~ ^[Yy]$ ]]; then
-            su - "$ACTUAL_USER" -c "bash \"$s\""
-        else
-            color_echo "yellow" "-> Skipped $(basename "$s")"
-        fi
-    done
-fi
 
 echo ""
 color_echo "green" "======================================================="

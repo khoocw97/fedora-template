@@ -3,9 +3,20 @@ set -euo pipefail
 
 # Firewall rules for KDE Connect and LocalSend.
 for zone in home public; do
+  # LAN discovery via mDNS (5353/udp)
+  sudo firewall-offline-cmd --zone="$zone" --add-service=mdns
   # KDE Connect (1714-1764/tcp+udp)
   sudo firewall-offline-cmd --zone="$zone" --add-service=kdeconnect
   # LocalSend (53317/tcp+udp)
   sudo firewall-offline-cmd --zone="$zone" --add-port=53317/tcp
   sudo firewall-offline-cmd --zone="$zone" --add-port=53317/udp
+  # Sunshine (https://docs.lizardbyte.dev/projects/sunshine/)
+  sudo firewall-offline-cmd --zone="$zone" --add-port=47984/tcp
+  sudo firewall-offline-cmd --zone="$zone" --add-port=47989/tcp
+  sudo firewall-offline-cmd --zone="$zone" --add-port=47990/tcp
+  sudo firewall-offline-cmd --zone="$zone" --add-port=48010/tcp
+  sudo firewall-offline-cmd --zone="$zone" --add-port=48010/udp
+  sudo firewall-offline-cmd --zone="$zone" --add-port=47998-48010/udp
 done
+
+sudo firewall-cmd --reload

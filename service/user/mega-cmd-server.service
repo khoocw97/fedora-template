@@ -1,0 +1,15 @@
+[Unit]
+Description=MEGAcmd Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# fix "Invalid utf8 accumulated occurrences")
+Environment=MEGACMD_DISABLE_UTF8_VALIDATIONS=1
+ExecStart=/usr/bin/mega-cmd-server
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

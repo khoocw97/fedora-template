@@ -65,7 +65,7 @@ color_echo "cyan" "[3/5] Optimizing DNF configuration files..."
 if [ -f /etc/dnf/dnf.conf ]; then
     # dnf5-plugins provides copr/config-manager for dnf5 (Fedora 41+)
     dnf install -y dnf5-plugins
-    dnf config-manager setopt max_parallel_downloads=20 minrate=1M timeout=30
+    dnf config-manager setopt max_parallel_downloads=10 timeout=30
     color_echo "green" "-> Complete (parallel download=20)"
 else
     color_echo "red" "-> Error: /etc/dnf/dnf.conf configuration file not found!"
@@ -75,7 +75,7 @@ fi
 # 4. Enable RPM Fusion / Multimedia decoder / Intel & AMD & Nvidia
 # ---------------------------------------------------------------------
 color_echo "cyan" "[4/5] Enabling RPM Fusion and completing system multimedia decoders..."
-# Repo mirror 
+# Repo mirror
 FEDORA_MIRROR="https://mirror.twds.com.tw/fedora/fedora/linux"
 RPMFUSION_MIRROR="https://mirror.twds.com.tw/rpmfusion"
 # Enable Fedora's OpenH264 repo (H.264 codec for Firefox)

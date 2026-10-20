@@ -268,12 +268,8 @@ fi
 if [ -d "$SCRIPT_DIR/script" ]; then
     for s in "$SCRIPT_DIR"/script/*; do
         [ -f "$s" ] || continue
-        read -p "Run $(basename "$s")? [y/N]: " run_script
-        if [[ "$run_script" =~ ^[Yy]$ ]]; then
-            su - "$ACTUAL_USER" -c "bash \"$s\""
-        else
-            color_echo "yellow" "-> Skipped $(basename "$s")"
-        fi
+        color_echo "cyan" "-> Running $(basename "$s")..."
+        su - "$ACTUAL_USER" -c "bash \"$s\"" || color_echo "yellow" "-> $(basename "$s") failed, continuing"
     done
 fi
 

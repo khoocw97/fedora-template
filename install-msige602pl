@@ -113,7 +113,7 @@ if [ -z "$nvidia_gpu_info" ]; then
 else
     color_echo "cyan" "NVIDIA GPU detected: $nvidia_gpu_info"
     color_echo "cyan" "-> Using driver-580 branch (Maxwell/Pascal)"
-    NVIDIA_PKGS="xorg-x11-drv-nvidia-580xx akmod-nvidia-580xx xorg-x11-drv-nvidia-580xx-cuda xorg-x11-drv-nvidia-cuda-libs"
+    NVIDIA_PKGS="xorg-x11-drv-nvidia-580xx akmod-nvidia-580xx xorg-x11-drv-nvidia-580xx-cuda xorg-x11-drv-nvidia-580xx-cuda-libs"
     #dnf config-manager addrepo --from-repofile=https://negativo17.org/repos/fedora-nvidia-580.repo
     #dnf config-manager setopt fedora-nvidia-580.priority=90
     color_echo "cyan" "-> Installing NVIDIA driver and CUDA components..."
@@ -123,7 +123,7 @@ else
     color_echo "green" "-> NVIDIA driver and libva-nvidia-driver installed"
 fi
 
-dnf install xorg-x11-drv-nvidia-power
+dnf install -y xorg-x11-drv-nvidia-580xx-power
 systemctl enable nvidia-{suspend,resume,hibernate}
 
 # --- AMD mesa freeworld (hardware-aware, lspci) ---
@@ -171,6 +171,12 @@ for repo in "${COPR_REPOS[@]}"; do
     dnf copr enable "$repo" -y
 done
 
+# === Pre-seed COPR-hosted packages via aria2 (multi-connection) ===
+# COPR file downloads are per-connection this downloads the big RPMs in
+# parallel and installs them, so the dnf lines below skip.
+bash "$SCRIPT_DIR/script/install-copr-rpms" \
+    || color_echo "yellow" "-> COPR pre-seed failed, falling back to plain dnf"
+
 # === Install config files (config/ mirrors /) ===
 if [ -d "$SCRIPT_DIR/config" ]; then
     color_echo "cyan" "-> Installing config files..."
@@ -179,7 +185,7 @@ if [ -d "$SCRIPT_DIR/config" ]; then
 fi
 
 BASE_PKGS=(
-    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat tealdeer duf # tools
+    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat tealdeer duf aria2 # tools
     gnome-keyring gnome-keyring-pam # keyring
     adw-gtk3-theme qt5ct qt6ct # unified theme
     xdg-user-dirs power-profiles-daemon # xdg user dirs / power profiles
@@ -187,7 +193,6 @@ BASE_PKGS=(
     fuse fuse-libs # AppImage support
     pipewire wireplumber alsa-utils pulseaudio-utils # Sound
     cups gutenprint gutenprint-cups sane-backends # Printer&Scanner for Canon e400 series
-    bibata-cursor-themes papirus-icon # from khoocw97's repo
     udiskie # auto-mount external drives (unit in service/user)
     zram-generator # zram swap (config in config/etc/systemd)
 )
@@ -199,7 +204,6 @@ FONT_PKGS=(
     google-noto-color-emoji-fonts google-noto-emoji-fonts google-noto-sans-cjk-vf-fonts
     fira-code-fonts glibc-all-langpacks
     langpacks-zh_CN langpacks-zh_TW langpacks-core-zh_CN langpacks-core-zh_TW langpacks-fonts-zh_CN langpacks-fonts-zh_TW
-    maple-mono-fonts lxgw-fonts # from khoocw97's repo
 )
 dnf install -y --setopt=install_weak_deps=False "${FONT_PKGS[@]}"
 
@@ -280,7 +284,10 @@ systemctl enable --now cups
 
 # === Personal Software ===
 dnf makecache
-dnf install -y google-chrome-stable yazi xournalpp helium-bin nemo kitty kdeconnectd sunshine fuzzel swayimg
+dnf install -y google-chrome-stable xournalpp nemo kitty kdeconnectd fuzzel swayimg
+
+# slow copr, using aria script
+# dnf install -y sunshine  helium-bin  maple-mono-fonts lxgw-fonts bibata-cursor-themes papirus-icon
 
 # === Enable Mega-CLI ===
 FEDORA_VERSION=$(rpm -E %fedora)

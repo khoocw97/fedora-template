@@ -204,6 +204,12 @@ for repo in "${COPR_REPOS[@]}"; do
     dnf copr enable "$repo" -y
 done
 
+# === Pre-seed COPR-hosted packages via aria2 (multi-connection) ===
+# COPR file downloads are per-connection this downloads the big RPMs in
+# parallel and installs them, so the dnf lines below skip.
+bash "$SCRIPT_DIR/script/install-copr-rpms" \
+    || color_echo "yellow" "-> COPR pre-seed failed, falling back to plain dnf"
+
 # === Install config files (config/ mirrors /) ===
 if [ -d "$SCRIPT_DIR/config" ]; then
     color_echo "cyan" "-> Installing config files..."
@@ -212,7 +218,7 @@ if [ -d "$SCRIPT_DIR/config" ]; then
 fi
 
 BASE_PKGS=(
-    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat tealdeer duf # tools
+    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat tealdeer duf aria2 # tools
     gnome-keyring gnome-keyring-pam # keyring
     adw-gtk3-theme qt5ct qt6ct # unified theme
     xdg-user-dirs power-profiles-daemon # xdg user dirs / power profiles

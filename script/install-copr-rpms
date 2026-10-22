@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# =====================================================================
+# Pre-seed COPR-hosted packages via aria2 (multi-connection download)
+# =====================================================================
+# COPR serves package files from copr-pulp-prod.s3.amazonaws.com (no CDN
+# edge); connection is throttled to ~50-100 KiB/s, dnf cannot split a
+# single file across connections. Aria2 (-x16) lifts that to ~1 MiB/s.
+# Download then install them locally.
+
+set -e
+
+rm -f /tmp/coprpkg.urls.txt
+for p in sunshine helium-bin yazi bibata-cursor-themes papirus-icon maple-mono-fonts lxgw-fonts; do
+  dnf repoquery --location "$p" | grep -E '(x86_64|noarch)\.rpm$' | sort -V | tail -1 >> /tmp/coprpkg.urls.txt
+done
+aria2c -c -i /tmp/coprpkg.urls.txt -j3 -x16 -s16 -k1M -d/tmp/coprpkg 2>/dev/null
+
+sudo dnf install -y /tmp/coprpkg/*.rpm

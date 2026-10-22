@@ -113,15 +113,18 @@ if [ -z "$nvidia_gpu_info" ]; then
 else
     color_echo "cyan" "NVIDIA GPU detected: $nvidia_gpu_info"
     color_echo "cyan" "-> Using driver-580 branch (Maxwell/Pascal)"
-    NVIDIA_PKGS="nvidia-driver nvidia-settings nvidia-driver-cuda akmod-nvidia nvidia-driver-libs.i686"
-    dnf config-manager addrepo --from-repofile=https://negativo17.org/repos/fedora-nvidia-580.repo
-    dnf config-manager setopt fedora-nvidia-580.priority=90
+    NVIDIA_PKGS="xorg-x11-drv-nvidia-580xx akmod-nvidia-580xx xorg-x11-drv-nvidia-580xx-cuda xorg-x11-drv-nvidia-cuda-libs"
+    #dnf config-manager addrepo --from-repofile=https://negativo17.org/repos/fedora-nvidia-580.repo
+    #dnf config-manager setopt fedora-nvidia-580.priority=90
     color_echo "cyan" "-> Installing NVIDIA driver and CUDA components..."
     dnf install -y $NVIDIA_PKGS
     color_echo "cyan" "-> Installing NVIDIA hardware acceleration..."
-    dnf install -y libva-nvidia-driver
+    dnf install -y libva-nvidia-driver libva-utils vdpauinfo
     color_echo "green" "-> NVIDIA driver and libva-nvidia-driver installed"
 fi
+
+dnf install xorg-x11-drv-nvidia-power
+systemctl enable nvidia-{suspend,resume,hibernate}
 
 # --- AMD mesa freeworld (hardware-aware, lspci) ---
 amd_gpu_info=$(lspci 2>/dev/null | grep -i -E "amd|radeon" | grep -i -E "graphics|vga|display" || true)

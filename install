@@ -218,6 +218,7 @@ if [ -d "$SCRIPT_DIR/config" ]; then
 fi
 
 BASE_PKGS=(
+    iwlwifi-dvm-firmware iwlwifi-mld-firmware iwlwifi-mvm-firmware # intel wifi card
     ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat tealdeer duf aria2 # tools
     gnome-keyring gnome-keyring-pam # keyring
     adw-gtk3-theme qt5ct qt6ct # unified theme

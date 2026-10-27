@@ -8,3 +8,5 @@ flatpak override --user --filesystem=xdg-config/obs-studio com.obsproject.Studio
 # Set wechat use wayland & fix chinese input
 flatpak override --user --socket=wayland com.tencent.WeChat
 flatpak override --user --env=QT_IM_MODULE=fcitx --env=GTK_IM_MODULE=fcitx com.tencent.WeChat
+# Grant firefox access to host documents dir
+flatpak override --user --filesystem=xdg-documents org.mozilla.firefox

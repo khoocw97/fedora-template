@@ -71,35 +71,32 @@ RPMFUSION_MIRROR="https://mirror.twds.com.tw/rpmfusion"
 dnf install -y "${RPMFUSION_MIRROR}/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
 dnf install -y "${RPMFUSION_MIRROR}/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
 dnf install -y 'rpmfusion-*-appstream-data'
-# Pin rpmfusion repos to the mirror (Disable metalink/mirrorlist, enable baseurl)
-# NOTE: on dnf5-based Fedora the vendor repo files live in /usr/share/dnf5/repos.d,
+# Pin Fedora + RPM Fusion repos to the mirror (disable metalink/mirrorlist,
+# enable baseurl). Fedora 45 moved packaged repo files to
+# /usr/share/dnf5/repos.d and reads local overrides from
+# /etc/dnf/repos.override.d, so write the pinned copies there instead of
+# editing vendor files (repo package updates would wipe those).
+install -d /etc/dnf/repos.override.d
 shopt -s nullglob
-RPMFUSION_REPOS=(/etc/yum.repos.d/rpmfusion*.repo /usr/share/dnf5/repos.d/rpmfusion*.repo)
-if ((${#RPMFUSION_REPOS[@]} == 0)); then
-    color_echo "yellow" "-> Warning: no rpmfusion repo files found, skipping pin"
-else
-    sed -e 's!^metalink=!#metalink=!g' \
-        -e 's!^mirrorlist=!#mirrorlist=!g' \
-        -e 's!^#baseurl=!baseurl=!g' \
-        -e "s!http://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
-        -e "s!https://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
-        -i.bak "${RPMFUSION_REPOS[@]}"
-    color_echo "green" "-> RPM Fusion repos pinned to $RPMFUSION_MIRROR"
-fi
-
-FEDORA_REPOS=()
+REPO_FILES=()
 for repo_dir in /etc/yum.repos.d /usr/share/dnf5/repos.d; do
-    for repo_file in fedora.repo fedora-updates.repo; do
-        [ -f "$repo_dir/$repo_file" ] && FEDORA_REPOS+=("$repo_dir/$repo_file")
+    for repo_file in "$repo_dir"/fedora.repo "$repo_dir"/fedora-updates.repo "$repo_dir"/rpmfusion*.repo; do
+        [ -f "$repo_file" ] && REPO_FILES+=("$repo_file")
     done
 done
-if ((${#FEDORA_REPOS[@]} == 0)); then
-    color_echo "yellow" "-> Warning: no Fedora repo files found, skipping pin"
+if ((${#REPO_FILES[@]} == 0)); then
+    color_echo "yellow" "-> Warning: no repo files found, skipping pin"
 else
-    sed -e 's|^metalink=|#metalink=|g' \
-        -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=${FEDORA_MIRROR}|g" \
-        -i.bak "${FEDORA_REPOS[@]}"
-    color_echo "green" "-> Fedora repos pinned to $FEDORA_MIRROR (metalink disabled)"
+    for repo_file in "${REPO_FILES[@]}"; do
+        sed -e 's!^metalink=!#metalink=!g' \
+            -e 's!^mirrorlist=!#mirrorlist=!g' \
+            -e 's!^#baseurl=!baseurl=!g' \
+            -e "s!http://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
+            -e "s!https://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
+            -e "s!^baseurl=http://download.example/pub/fedora/linux!baseurl=${FEDORA_MIRROR}!g" \
+            "$repo_file" > "/etc/dnf/repos.override.d/$(basename "$repo_file")"
+    done
+    color_echo "green" "-> Repos pinned via /etc/dnf/repos.override.d"
 fi
 shopt -u nullglob
 
@@ -186,8 +183,8 @@ fi
 
 BASE_PKGS=(
     iwlwifi-dvm-firmware iwlwifi-mld-firmware iwlwifi-mvm-firmware # intel wifi card
-    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat tealdeer duf aria2 # tools
-    gnome-keyring gnome-keyring-pam # keyring
+    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat duf aria2 # tools
+    oo7-daemon oo7-portal pam_oo7 # keyring (Fedora 45 default, replaces gnome-keyring)
     adw-gtk3-theme qt5ct qt6ct # unified theme
     xdg-user-dirs power-profiles-daemon # xdg user dirs / power profiles
     flatpak glibc-langpack-zh glibc-langpack-en # Flatpak & locale
@@ -197,7 +194,7 @@ BASE_PKGS=(
     udiskie # auto-mount external drives (unit in service/user)
     zram-generator # zram swap (config in config/etc/systemd)
 )
-dnf install -y "${BASE_PKGS[@]}"
+dnf install -y --skip-unavailable "${BASE_PKGS[@]}"
 
 # --- Fonts & locale (no weak deps) ---
 FONT_PKGS=(
@@ -206,7 +203,7 @@ FONT_PKGS=(
     fira-code-fonts glibc-all-langpacks
     langpacks-zh_CN langpacks-zh_TW langpacks-core-zh_CN langpacks-core-zh_TW langpacks-fonts-zh_CN langpacks-fonts-zh_TW
 )
-dnf install -y --setopt=install_weak_deps=False "${FONT_PKGS[@]}"
+dnf install -y --skip-unavailable --setopt=install_weak_deps=False "${FONT_PKGS[@]}"
 
 # --- Switch input method from ibus to fcitx5 + rime ---
 dnf install -y fcitx5 fcitx5-chinese-addons fcitx5-configtool fcitx5-rime fcitx5-gtk fcitx5-qt librime librime-lua librime-octagram

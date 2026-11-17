@@ -42,3 +42,7 @@ msi:
 # Normal Installation
 install:
     sudo ./install
+
+# Optimize DNF; `just dnf repo` also enables RPM Fusion and pins the mirrors
+dnf task="":
+    ./setup-dnf {{task}}

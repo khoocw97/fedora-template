@@ -62,55 +62,16 @@ hostnamectl set-hostname "$new_hostname"
 # 3. Optimized DNF package manager
 # ---------------------------------------------------------------------
 color_echo "cyan" "[3/5] Optimizing DNF configuration files..."
-if [ -f /etc/dnf/dnf.conf ]; then
-    # dnf5-plugins provides copr/config-manager for dnf5 (Fedora 41+)
-    dnf install -y dnf5-plugins
-    dnf config-manager setopt max_parallel_downloads=10 timeout=30
-    color_echo "green" "-> Complete (parallel download=20)"
-else
-    color_echo "red" "-> Error: /etc/dnf/dnf.conf configuration file not found!"
-fi
+"$SCRIPT_DIR/setup-dnf"
 
 # ---------------------------------------------------------------------
 # 4. Enable RPM Fusion / Multimedia decoder / Intel & AMD & Nvidia
 # ---------------------------------------------------------------------
 color_echo "cyan" "[4/5] Enabling RPM Fusion and completing system multimedia decoders..."
-# Repo mirror
-FEDORA_MIRROR="https://mirror.twds.com.tw/fedora/fedora/linux"
-RPMFUSION_MIRROR="https://mirror.twds.com.tw/rpmfusion"
-# Enable Fedora's OpenH264 repo (H.264 codec for Firefox)
-# dnf config-manager setopt fedora-cisco-openh264.enabled=1
-dnf install -y "${RPMFUSION_MIRROR}/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
-dnf install -y "${RPMFUSION_MIRROR}/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
+# Enable RPM Fusion and pin Fedora/RPM Fusion repos to the TWDS mirror
+# (see setup-dnf for the metalink/baseurl handling)
+"$SCRIPT_DIR/setup-dnf" repo
 dnf install -y 'rpmfusion-*-appstream-data'
-# Pin Fedora + RPM Fusion repos to the mirror (disable metalink/mirrorlist,
-# enable baseurl). Fedora 45 moved packaged repo files to
-# /usr/share/dnf5/repos.d and reads local overrides from
-# /etc/dnf/repos.override.d, so write the pinned copies there instead of
-# editing vendor files (repo package updates would wipe those).
-install -d /etc/dnf/repos.override.d
-shopt -s nullglob
-REPO_FILES=()
-for repo_dir in /etc/yum.repos.d /usr/share/dnf5/repos.d; do
-    for repo_file in "$repo_dir"/fedora.repo "$repo_dir"/fedora-updates.repo "$repo_dir"/rpmfusion*.repo; do
-        [ -f "$repo_file" ] && REPO_FILES+=("$repo_file")
-    done
-done
-if ((${#REPO_FILES[@]} == 0)); then
-    color_echo "yellow" "-> Warning: no repo files found, skipping pin"
-else
-    for repo_file in "${REPO_FILES[@]}"; do
-        sed -e 's!^metalink=!#metalink=!g' \
-            -e 's!^mirrorlist=!#mirrorlist=!g' \
-            -e 's!^#baseurl=!baseurl=!g' \
-            -e "s!http://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
-            -e "s!https://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
-            -e "s!^baseurl=http://download.example/pub/fedora/linux!baseurl=${FEDORA_MIRROR}!g" \
-            "$repo_file" > "/etc/dnf/repos.override.d/$(basename "$repo_file")"
-    done
-    color_echo "green" "-> Repos pinned via /etc/dnf/repos.override.d"
-fi
-shopt -u nullglob
 
 # --- lspci install ---
 command -v lspci >/dev/null 2>&1 || dnf install -y pciutils

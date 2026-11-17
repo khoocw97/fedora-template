@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# DNF tuning + optional mirror pinning.
+# Usage: ./setup-dnf [repo]   (run as root)
+#   (no arg)  optimize /etc/dnf/dnf.conf
+#   repo      also enable RPM Fusion and pin Fedora/RPM Fusion to the mirror
+set -euo pipefail
+
+# Re-run through pkexec when not root (polkit prompt instead of manual sudo)
+if [ "$EUID" -ne 0 ]; then
+    SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+    if command -v pkexec >/dev/null 2>&1; then
+        exec pkexec "$SELF" "$@"
+    fi
+    exec sudo "$SELF" "$@"
+fi
+
+FEDORA_MIRROR="${FEDORA_MIRROR:-https://mirror.twds.com.tw/fedora/fedora/linux}"
+RPMFUSION_MIRROR="${RPMFUSION_MIRROR:-https://mirror.twds.com.tw/rpmfusion}"
+MAX_PARALLEL="${MAX_PARALLEL:-10}"
+
+color_echo() {
+    local color="$1" text="$2"
+    case "$color" in
+        red)    echo -e "\033[0;31m$text\033[0m" ;;
+        green)  echo -e "\033[0;32m$text\033[0m" ;;
+        yellow) echo -e "\033[1;33m$text\033[0m" ;;
+        cyan)   echo -e "\033[0;36m$text\033[0m" ;;
+        *)      echo "$text" ;;
+    esac
+}
+
+if [ ! -f /etc/dnf/dnf.conf ]; then
+    color_echo red "-> Error: /etc/dnf/dnf.conf configuration file not found!"
+    exit 1
+fi
+
+# dnf5-plugins provides copr/config-manager for dnf5 (Fedora 41+)
+dnf install -y dnf5-plugins
+dnf config-manager setopt max_parallel_downloads="$MAX_PARALLEL" timeout=30
+color_echo green "-> DNF optimized (max_parallel_downloads=$MAX_PARALLEL, timeout=30)"
+
+[ "${1:-}" = "repo" ] || exit 0
+
+# RPM Fusion release packages (idempotent)
+dnf install -y "${RPMFUSION_MIRROR}/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+dnf install -y "${RPMFUSION_MIRROR}/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
+
+# Pin Fedora + RPM Fusion repos to the mirror. Fedora 45 ships the repo files
+# in /usr/share/dnf5/repos.d and merges /etc/dnf/repos.override.d/*.repo over
+# them. An override only changes the keys it names, so commenting out
+# `metalink` there does NOT disable the vendor metalink (which wins over
+# baseurl, and its mirror list points back at the "fastest" mirror, e.g.
+# mirrors.qlu.edu.cn). It has to be set to an empty value instead.
+# Seed each override from the vendor file once, then pin it in place.
+# To restore stock config: delete /etc/dnf/repos.override.d/*.repo
+OVR_DIR=/etc/dnf/repos.override.d
+install -d "$OVR_DIR"
+shopt -s nullglob
+REPO_FILES=(/usr/share/dnf5/repos.d/fedora.repo
+            /usr/share/dnf5/repos.d/fedora-updates.repo
+            /usr/share/dnf5/repos.d/rpmfusion*.repo)
+shopt -u nullglob
+
+if ((${#REPO_FILES[@]} == 0)); then
+    color_echo yellow "-> Warning: no repo files found, skipping pin"
+    exit 0
+fi
+
+for repo_file in "${REPO_FILES[@]}"; do
+    target="$OVR_DIR/$(basename "$repo_file")"
+    [ -f "$target" ] || install -m 0644 "$repo_file" "$target"
+    sed -i \
+        -e 's!^#\?metalink=.*!metalink=!' \
+        -e 's!^#\?mirrorlist=.*!mirrorlist=!' \
+        -e 's!^#\?baseurl=!baseurl=!' \
+        -e "s!http://download.example/pub/fedora/linux!${FEDORA_MIRROR}!g" \
+        -e "s!http://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
+        -e "s!https://download1.rpmfusion.org!${RPMFUSION_MIRROR}!g" \
+        "$target"
+done
+color_echo green "-> Repos pinned via $OVR_DIR (metalink cleared, baseurl -> $FEDORA_MIRROR)"

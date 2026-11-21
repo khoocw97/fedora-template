@@ -144,7 +144,7 @@ fi
 
 BASE_PKGS=(
     iwlwifi-dvm-firmware iwlwifi-mld-firmware iwlwifi-mvm-firmware # intel wifi card
-    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf bat duf aria2 # tools
+    ddcutil brightnessctl fastfetch usbutils git wget curl rsync chezmoi make just starship ripgrep fd-find zoxide eza fzf gum bat duf aria2 # tools
     oo7-daemon oo7-portal pam_oo7 # keyring (Fedora 45 default, replaces gnome-keyring)
     adw-gtk3-theme qt5ct qt6ct # unified theme
     xdg-user-dirs power-profiles-daemon # xdg user dirs / power profiles
